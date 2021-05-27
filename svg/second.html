@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>svg绘制层级关系图</title>
+</head>
+<body>
+    <!-- dataset = { total: [25, 26, 40, 45, 68], current: [15, 11, 17, 25, 37], } -->
+    <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="400" height="400" style="border:1px solid #ccc;">
+        
+    </svg>
+
+    <script>
+        var root = {
+            "name": "中国",
+            "children": [
+                {
+                    "name": "浙江",
+                    "children": [
+                        { "name": "杭州",value: 10, x: 250, y: 80, r: 40, }, 
+                        { "name": "宁波",value: 25, x: 180, y: 120, r: 40, }
+                    ],
+                    value: 50, x: 200, y: 100, r: 100
+                }, 
+                {
+                    "name": "广西",
+                    "children": [
+                        {"name": "桂林",value: 25, x: 250, y: 280, r: 40,}, 
+                        {"name": "南宁",value: 25, x: 180, y: 320, r: 40,}
+                    ],
+                    value: 50, x: 200, y: 300, r: 100
+                }
+            ],
+            value: 100, x: 200, y: 200, r: 200
+        }
+
+        var svg = document.querySelector("svg");
+
+        draw(svg,root)
+
+        // 绘制
+        function draw(parent,node, {fillStyle = 'rgba(0, 0, 0, 0.2)', textColor = 'white'} = {}){
+            const {x,y,r,children} = node;
+            const circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
+            circle.setAttribute('cx', x); 
+            circle.setAttribute('cy', y); 
+            circle.setAttribute('r', r);
+            circle.setAttribute('fill', fillStyle);
+            parent.appendChild(circle)
+
+            if(children){
+                const group = document.createElementNS("http://www.w3.org/2000/svg","g");
+                for (let i = 0; i < children.length; i++) {
+                    const item = children[i];
+                    draw(group,children[i],{fillStyle,textColor})
+                }
+                parent.appendChild(group)
+            }else{
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('fill', textColor);
+                text.setAttribute('font-family', 'Arial');
+                text.setAttribute('font-size', '1.5rem');
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('x', x);
+                text.setAttribute('y', y);
+                const name = node.name; 
+                text.textContent = name; 
+                parent.appendChild(text);
+            }
+        }
+    </script>
+</body>
+</html>

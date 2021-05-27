@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.用向量绘制一棵树</title>
+</head>
+<body>
+    <canvas width="500" height="500"></canvas>
+
+    <script>
+        let canvas = document.querySelector("canvas");
+        let ctx = canvas.getContext("2d")
+
+        // 1.设置坐标，坐标变换
+        ctx.translate(0, canvas.height);//将坐标原点平移到画布最底部
+        ctx.scale(1,-1);//翻转y轴，让y轴朝上
+        ctx.lineCap = 'round';// 定义线条末端线帽的样式
+        
+        /**
+         * 2.设置向量
+         * （1）设置x轴基向量(1,0)
+         * （2）设置实际向量：
+         *      a.设置x轴基向量一个旋转弧度r，这时基向量的坐标为（x*cosr-y*sinr,y*cosr+x*sinr）,动静坐标转换得到的公式
+         *      b.将旋转后的向量，放大L倍，坐标为L（x*cosr-y*sinr,y*cosr+x*sinr）
+         */
+        class Vector2D extends Array {
+            // 生成坐标向量
+            constructor(x = 1, y = 0) {
+                super(x, y);
+            }
+            set x(v) {
+                this[0] = v;
+            }
+            set y(v) {
+                this[1] = v;
+            }
+            get x() {
+                return this[0];
+            }
+            get y() {
+                return this[1];
+            }
+            get length() {
+                // 计算向量的模
+                return Math.hypot(this.x, this.y);
+            }
+            get dir() {
+                // 计算向量的旋转的弧度
+                return Math.atan2(this.y, this.x);
+            }
+            copy() {
+                // 复制坐标向量
+                return new Vector2D(this.x, this.y);
+            }
+            // 坐标向量相加
+            add(v) {
+                this.x += v.x;
+                this.y += v.y;
+                return this;
+            }
+            // 坐标向量相减
+            sub(v) {
+                this.x -= v.x;
+                this.y -= v.y;
+                return this;
+            }
+            // 倍数延长坐标向量
+            scale(a) {
+                this.x *= a;
+                this.y *= a;
+                return this;
+            }
+            // 向量叉乘的模
+            cross(v) {
+                return this.x * v.y - v.x * this.y;
+            }
+            // 向量点乘的值
+            dot(v) {
+                return this.x * v.x + v.y * this.y;
+            }
+            // 基向量
+            normalize() {
+                return this.scale(1 / this.length);
+            }
+            // 向量旋转
+            rotate(rad) {
+                const c = Math.cos(rad),
+                s = Math.sin(rad);
+                const [x, y] = this;
+
+                this.x = x * c + y * -s;
+                this.y = x * s + y * c;
+
+                return this;
+            }
+        }
+        
+        /**
+         * 3.绘制树枝的函数
+         * @param  { ctx } context       canvas上下文
+         * @param  { number } v0         起始向量
+         * @param  { number } length     当前树枝的长度
+         * @param  { number } thickness  当前树枝的粗细
+         * @param  { number } dir        当前树枝的方向，用与 x 轴的夹角表示，单位是弧度。
+         * @param  { number } bias       一个随机偏向因子，用来让树枝的朝向有一定的随机性
+         * 
+         */ 
+        function drawBranch(context, v0, length, thickness, dir, bias) {
+            // 生成旋转一定角度的向量v（数组表示）
+            const v = new Vector2D(1,0).rotate(dir).scale(length);
+            // 3.1 根据初始向量坐标与生成的向量相加运算，生成新的向量
+            const v1 = v0.copy().add(v);
+
+            // 3.3 绘制线段（树枝）
+            context.lineWidth = thickness;//设置粗细
+            context.beginPath();//开始路径
+            context.moveTo(...v0);//从v0坐标开始
+            context.lineTo(...v1);//到v1坐标结束
+            context.stroke();//绘制出路径
+
+            // 3.3 如果树枝粗细大于2的话，要继续分叉
+            if(thickness > 2) {
+                // 随机的角度进行左分叉
+                const left = Math.PI / 4 + 0.5 * (dir + 0.2) + bias * (Math.random() - 0.5);
+                drawBranch(context, v1, length * 0.9, thickness * 0.8, left, bias * 0.9);
+                // 随机的角度进行右分叉
+                const right = Math.PI / 4 + 0.5 * (dir - 0.2) + bias * (Math.random() - 0.5);
+                drawBranch(context, v1, length * 0.9, thickness * 0.8, right, bias * 0.9);
+            }
+
+            // 3.4 设置树叶的样式
+            if(thickness < 5 && Math.random() < 0.3) {
+                context.save();
+                context.strokeStyle = '#c72c35';
+                const th = Math.random() * 6 + 3;
+                context.lineWidth = th;
+                context.beginPath();
+                context.moveTo(...v1);
+                context.lineTo(v1.x, v1.y - 2);
+                context.stroke();
+                context.restore();
+            }
+        }
+
+        const v0 = new Vector2D(250, 0);//初始向量设置
+
+        // 初始弧度，线宽，线长，随机因子
+        drawBranch(ctx, v0, 50, 10, 1.5, 3);
+
+    </script>
+</body>
+</html>

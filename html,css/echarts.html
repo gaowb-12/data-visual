@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>html+css实现柱状图</title>
+    <style>
+      .container {
+        display: grid;
+        width: 150px;
+        height: 200px;
+        padding: 10px;
+        /* transform: scaleY(2); */
+        transform-origin: top;
+        grid-template-columns: repeat(5, 20%);
+      }
+      .container .item {
+        margin: 0 2px;
+      }
+      .container .item:nth-child(1) {
+        background: linear-gradient(
+          to bottom,
+          transparent 75%,
+          #37c 0,
+          #37c 85%,
+          #3c7 0
+        );
+      }
+      .container .item:nth-child(2) {
+        background: linear-gradient(
+          to bottom,
+          transparent 74%,
+          #37c 0,
+          #37c 89%,
+          #3c7 0
+        );
+      }
+      .container .item:nth-child(3) {
+        background: linear-gradient(
+          to bottom,
+          transparent 60%,
+          #37c 0,
+          #37c 83%,
+          #3c7 0
+        );
+      }
+      .container .item:nth-child(4) {
+        background: linear-gradient(
+          to bottom,
+          transparent 55%,
+          #37c 0,
+          #37c 75%,
+          #3c7 0
+        );
+      }
+      .container .item:nth-child(5) {
+        background: linear-gradient(
+          to bottom,
+          transparent 32%,
+          #37c 0,
+          #37c 63%,
+          #3c7 0
+        );
+      }
+    </style>
+    <style>
+      .container-1 {
+        width: 200px;
+        height: 200px;
+        padding: 10px;
+        border-radius: 50%;
+        background-image: conic-gradient(#37c 30deg, #3c7 30deg, #3c7 65deg, orange 65deg, orange 110deg, #f73 110deg, #f73 200deg, #ccc 200deg);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- dataset = { current: [15, 11, 17, 25, 37], total: [25, 26, 40, 45, 68], } -->
+    <div class="container">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div class="container-1">
+
+    </div>
+  </body>
+</html>
