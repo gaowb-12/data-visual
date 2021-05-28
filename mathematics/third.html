@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2.用向量绘制一棵树</title>
+    <title>3.用向量描述曲线</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
 </head>
 <body>
     <canvas width="500" height="500"></canvas>
@@ -14,7 +21,7 @@
         let ctx = canvas.getContext("2d")
 
         // 1.设置坐标，坐标变换
-        ctx.translate(0, canvas.height);//将坐标原点平移到画布最底部
+        ctx.translate(canvas.width/2, canvas.height/2);//将坐标原点平移到画布最底部
         ctx.scale(1,-1);//翻转y轴，让y轴朝上
         ctx.lineCap = 'round';// 定义线条末端线帽的样式
         
@@ -98,58 +105,48 @@
         }
         
         /**
-         * 3.绘制树枝的函数
-         * @param  { ctx } context       canvas上下文
-         * @param  { Array } v0         起始向量
-         * @param  { number } length     当前树枝的长度
-         * @param  { number } thickness  当前树枝的粗细
-         * @param  { number } dir        当前树枝的方向，用与 x 轴的夹角表示，单位是弧度。
-         * @param  { number } bias       一个随机偏向因子，用来让树枝的朝向有一定的随机性
-         * 
+         * 用向量绘制折线的方法来绘制正多边形
+         * @param { number } edges 起点
+         * @param { number } x 起点 
+         * @param { number } y 起点
+         * @param { number } step 一条边的长度
          */ 
-        function drawBranch(context, v0, length, thickness, dir, bias) {
-            // 生成旋转一定角度的向量v（数组表示）
-            const v = new Vector2D(1,0).rotate(dir).scale(length);
-            // 3.1 根据初始向量坐标与生成的向量相加运算，生成新的向量
-            const v1 = v0.copy().add(v);
-
-            // 3.3 绘制线段（树枝）
-            context.lineWidth = thickness;//设置粗细
-            context.beginPath();//开始路径
-            context.moveTo(...v0);//从v0坐标开始
-            context.lineTo(...v1);//到v1坐标结束
-            context.stroke();//绘制出路径
-
-            // 3.3 如果树枝粗细大于2的话，要继续分叉
-            if(thickness > 2) {
-                // 随机的角度进行左分叉
-                const left = Math.PI / 4 + 0.5 * (dir + 0.2) + bias * (Math.random() - 0.5);
-                drawBranch(context, v1, length * 0.9, thickness * 0.8, left, bias * 0.9);
-                // 随机的角度进行右分叉
-                const right = Math.PI / 4 + 0.5 * (dir - 0.2) + bias * (Math.random() - 0.5);
-                drawBranch(context, v1, length * 0.9, thickness * 0.8, right, bias * 0.9);
+        function regularShape(edges = 3, x, y, step) {
+            const ret = [];
+            // 根据正多边形内角和公式计算出来的每次向量需要旋转的弧度
+            const delta = Math.PI * (1 - (edges - 2) / edges);
+            // 设置初始位置
+            let p = new Vector2D(x, y);
+            // 设置初始边方向
+            const dir = new Vector2D(step, 0);
+            ret.push(p);
+            // 计算坐标，添加为做标集合
+            for(let i = 0; i < edges; i++) {
+                p = p.copy().add(dir.rotate(delta));
+                ret.push(p);
             }
-
-            // 3.4 设置树叶的样式
-            if(thickness < 5 && Math.random() < 0.3) {
-                context.save();
-                context.strokeStyle = '#c72c35';
-                const th = Math.random() * 6 + 3;
-                context.lineWidth = th;
-                context.beginPath();
-                context.moveTo(...v1);
-                context.lineTo(v1.x, v1.y - 2);
-                context.stroke();
-                context.restore();
-            }
+            return ret;
         }
 
-        const v0 = new Vector2D(250, 0);//初始向量设置
-
-        // 初始弧度，线宽，线长，随机因子
-        drawBranch(ctx, v0, 50, 10, 1.5, 3);
-        
-        // const isInRange = Math.abs(new Vec2(0, 1).cross(v0.normalize())) <= 0.5; // v0.normalize()即将v0归一化
+        // 根据坐标绘制多边形
+        function draw(points, strokeStyle = 'black', fillStyle = null) {
+            ctx.strokeStyle = strokeStyle;
+            ctx.beginPath();
+            ctx.moveTo(...points[0]);
+            for(let i = 1; i < points.length; i++) {
+                ctx.lineTo(...points[i]);
+            }
+            ctx.closePath();
+            if(fillStyle) {
+                ctx.fillStyle = fillStyle;
+                ctx.fill();
+            }
+            ctx.stroke();
+        }
+        draw(regularShape(3, 128, 128, 100)); // 绘制三角形
+        draw(regularShape(6, -64, 128, 50)); // 绘制六边形
+        draw(regularShape(11, -64, -64, 30)); // 绘制十一边形
+        draw(regularShape(60, 128, -64, 6)); // 绘制六十边形
     </script>
 </body>
 </html>

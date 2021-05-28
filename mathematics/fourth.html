@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2.用向量绘制一棵树</title>
+    <title>4.用参数方程描述曲线</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
 </head>
 <body>
     <canvas width="500" height="500"></canvas>
@@ -14,7 +21,7 @@
         let ctx = canvas.getContext("2d")
 
         // 1.设置坐标，坐标变换
-        ctx.translate(0, canvas.height);//将坐标原点平移到画布最底部
+        ctx.translate(canvas.width/2, canvas.height/2);//将坐标原点平移到画布最底部
         ctx.scale(1,-1);//翻转y轴，让y轴朝上
         ctx.lineCap = 'round';// 定义线条末端线帽的样式
         
@@ -98,58 +105,52 @@
         }
         
         /**
-         * 3.绘制树枝的函数
-         * @param  { ctx } context       canvas上下文
-         * @param  { Array } v0         起始向量
-         * @param  { number } length     当前树枝的长度
-         * @param  { number } thickness  当前树枝的粗细
-         * @param  { number } dir        当前树枝的方向，用与 x 轴的夹角表示，单位是弧度。
-         * @param  { number } bias       一个随机偏向因子，用来让树枝的朝向有一定的随机性
-         * 
+         * 用向量绘制折线的方法来绘制正多边形
+         * @param { number } x0 起点
+         * @param { number } y0 起点
+         * @param { number } radius 半径长度
+         * @param { number } startAng 起始角度
+         * @param { number } endAng 结束角度
          */ 
-        function drawBranch(context, v0, length, thickness, dir, bias) {
-            // 生成旋转一定角度的向量v（数组表示）
-            const v = new Vector2D(1,0).rotate(dir).scale(length);
-            // 3.1 根据初始向量坐标与生成的向量相加运算，生成新的向量
-            const v1 = v0.copy().add(v);
-
-            // 3.3 绘制线段（树枝）
-            context.lineWidth = thickness;//设置粗细
-            context.beginPath();//开始路径
-            context.moveTo(...v0);//从v0坐标开始
-            context.lineTo(...v1);//到v1坐标结束
-            context.stroke();//绘制出路径
-
-            // 3.3 如果树枝粗细大于2的话，要继续分叉
-            if(thickness > 2) {
-                // 随机的角度进行左分叉
-                const left = Math.PI / 4 + 0.5 * (dir + 0.2) + bias * (Math.random() - 0.5);
-                drawBranch(context, v1, length * 0.9, thickness * 0.8, left, bias * 0.9);
-                // 随机的角度进行右分叉
-                const right = Math.PI / 4 + 0.5 * (dir - 0.2) + bias * (Math.random() - 0.5);
-                drawBranch(context, v1, length * 0.9, thickness * 0.8, right, bias * 0.9);
+        
+        const TAU_SEGMENTS = 60;
+        const TAU = Math.PI * 2;
+        
+        function arc(x0, y0, radius, startAng = 0, endAng = Math.PI * 2) {
+            // 获取圆的最大弧度
+            const ang = Math.min(TAU, endAng - startAng);
+            // 如果弧度是2π，那就定义一个空数组，否则加入圆点（为了生成扇形区域）
+            const ret = ang === TAU ? [] : [[x0, y0]];
+            // 将圆弧分成片段
+            const segments = Math.round(TAU_SEGMENTS * ang / TAU);
+            for(let i = 0; i <= segments; i++) {
+                // 将小片段的坐标点加入集合中
+                const x = x0 + radius * Math.cos(startAng + ang * i / segments);
+                const y = y0 + radius * Math.sin(startAng + ang * i / segments);
+                ret.push([x, y]);
             }
-
-            // 3.4 设置树叶的样式
-            if(thickness < 5 && Math.random() < 0.3) {
-                context.save();
-                context.strokeStyle = '#c72c35';
-                const th = Math.random() * 6 + 3;
-                context.lineWidth = th;
-                context.beginPath();
-                context.moveTo(...v1);
-                context.lineTo(v1.x, v1.y - 2);
-                context.stroke();
-                context.restore();
-            }
+            return ret;
         }
 
-        const v0 = new Vector2D(250, 0);//初始向量设置
-
-        // 初始弧度，线宽，线长，随机因子
-        drawBranch(ctx, v0, 50, 10, 1.5, 3);
+        // 根据坐标绘制多边形
+        function draw(points, strokeStyle = 'black', fillStyle = null) {
+            console.log(points)
+            ctx.strokeStyle = strokeStyle;
+            ctx.beginPath();
+            ctx.moveTo(...points[0]);
+            for(let i = 1; i < points.length; i++) {
+                ctx.lineTo(...points[i]);
+            }
+            ctx.closePath();
+            if(fillStyle) {
+                ctx.fillStyle = fillStyle;
+                ctx.fill();
+            }
+            ctx.stroke();
+        }
         
-        // const isInRange = Math.abs(new Vec2(0, 1).cross(v0.normalize())) <= 0.5; // v0.normalize()即将v0归一化
+        draw(arc(0, 0, 100)); // 绘制圆
+
     </script>
 </body>
 </html>
