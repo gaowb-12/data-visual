@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5.高阶函数绘制曲线</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="800" height="800"></canvas>
+
+    <script>
+        let canvas = document.querySelector("canvas");
+        let ctx = canvas.getContext("2d")
+
+        // 1.设置坐标，坐标变换
+        ctx.translate(canvas.width/2, canvas.height/2);//将坐标原点平移到画布最底部
+        ctx.scale(1,-1);//翻转y轴，让y轴朝上
+        ctx.lineCap = 'round';// 定义线条末端线帽的样式
+        
+        /**
+         * 2.设置向量
+         * （1）设置x轴基向量(1,0)
+         * （2）设置实际向量：
+         *      a.设置x轴基向量一个旋转弧度r，这时基向量的坐标为（x*cosr-y*sinr,y*cosr+x*sinr）,动静坐标转换得到的公式
+         *      b.将旋转后的向量，放大L倍，坐标为L（x*cosr-y*sinr,y*cosr+x*sinr）
+         */
+        class Vector2D extends Array {
+            // 生成坐标向量
+            constructor(x = 1, y = 0) {
+                super(x, y);
+            }
+            set x(v) {
+                this[0] = v;
+            }
+            set y(v) {
+                this[1] = v;
+            }
+            get x() {
+                return this[0];
+            }
+            get y() {
+                return this[1];
+            }
+            get length() {
+                // 计算向量的模
+                return Math.hypot(this.x, this.y);
+            }
+            get dir() {
+                // 计算向量的旋转的弧度
+                return Math.atan2(this.y, this.x);
+            }
+            copy() {
+                // 复制坐标向量
+                return new Vector2D(this.x, this.y);
+            }
+            // 坐标向量相加
+            add(v) {
+                this.x += v.x;
+                this.y += v.y;
+                return this;
+            }
+            // 坐标向量相减
+            sub(v) {
+                this.x -= v.x;
+                this.y -= v.y;
+                return this;
+            }
+            // 倍数延长坐标向量
+            scale(a) {
+                this.x *= a;
+                this.y *= a;
+                return this;
+            }
+            // 向量叉乘的模
+            cross(v) {
+                return this.x * v.y - v.x * this.y;
+            }
+            // 向量点乘的值
+            dot(v) {
+                return this.x * v.x + v.y * this.y;
+            }
+            // 向量归一化（向量除以向量的模）
+            normalize() {
+                return this.scale(1 / this.length);
+            }
+            // 向量旋转
+            rotate(rad) {
+                const c = Math.cos(rad),
+                s = Math.sin(rad);
+                const [x, y] = this;
+
+                this.x = x * c + y * -s;
+                this.y = x * s + y * c;
+
+                return this;
+            }
+        }
+        
+
+        
+        // 根据点来绘制图形
+        function draw(points, context, {
+            strokeStyle = 'black',
+            fillStyle = null,
+            close = false,
+        } = {}) {
+            context.strokeStyle = strokeStyle;
+            context.beginPath();
+            context.moveTo(...points[0]);
+            for(let i = 1; i < points.length; i++) {
+                context.lineTo(...points[i]);
+            }
+            if(close) context.closePath();
+            if(fillStyle) {
+                context.fillStyle = fillStyle;
+                context.fill();
+            }
+            context.stroke();
+        }
+        // 高阶函数
+        function parametric(xFunc, yFunc) {
+            return function (start, end, seg = 100, ...args) {
+                const points = [];
+                for(let i = 0; i <= seg; i++) {
+                    const p = i / seg;
+                    const t = start * (1 - p) + end * p;
+                    const x = xFunc(t, ...args); // 计算参数方程组的x
+                    const y = yFunc(t, ...args);  // 计算参数方程组的y
+                    points.push([x, y]);
+                }
+                return {
+                    draw: draw.bind(null, points),
+                    points,
+                };
+            };
+        }
+
+        // 1.抛物线参数方程
+        const para = parametric( t => 25 * t, t => 25 * t ** 2,);
+        // 绘制抛物线
+        para(-5.5, 5.5).draw(ctx);
+
+        // 2.阿基米德螺旋线
+        const helical = parametric(
+            (t, l) => l * t * Math.cos(t),
+            (t, l) => l * t * Math.sin(t),
+        );
+        // 绘制阿基米德螺旋线
+        helical(0, 50, 500, 5).draw(ctx, {strokeStyle: 'blue'});
+
+        // 3.绘制星形线
+        const star = parametric(
+        (t, l) => l * Math.cos(t) ** 3,
+        (t, l) => l * Math.sin(t) ** 3,
+        );
+        // 绘制星形线
+        star(0, Math.PI * 2, 50, 150).draw(ctx, {strokeStyle: 'red'});
+
+    </script>
+</body>
+</html>
