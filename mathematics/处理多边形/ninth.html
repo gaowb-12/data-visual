@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>9.Canvas2D 如何判断点在多边形内部</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="800" height="800"></canvas>
+
+    <script type="module">
+        // 导入进行三角剖分的库
+        import { earcut } from '../common/lib/earcut.js';
+
+        const canvas = document.querySelector("canvas")
+        let ctx = canvas.getContext("2d")
+
+        // 1.设置坐标，坐标变换
+        ctx.translate(canvas.width/2, canvas.height/2);//将坐标原点平移到画布最底部
+        ctx.scale(1,-1);//翻转y轴，让y轴朝上
+        ctx.lineCap = 'round';// 定义线条末端线帽的样式
+        
+        /**
+         * 2.设置向量
+         * （1）设置x轴基向量(1,0)
+         * （2）设置实际向量：
+         *      a.设置x轴基向量一个旋转弧度r，这时基向量的坐标为（x*cosr-y*sinr,y*cosr+x*sinr）,动静坐标转换得到的公式
+         *      b.将旋转后的向量，放大L倍，坐标为L（x*cosr-y*sinr,y*cosr+x*sinr）
+         */
+        class Vector2D extends Array {
+            // 生成坐标向量
+            constructor(x = 1, y = 0) {
+                super(x, y);
+            }
+            set x(v) {
+                this[0] = v;
+            }
+            set y(v) {
+                this[1] = v;
+            }
+            get x() {
+                return this[0];
+            }
+            get y() {
+                return this[1];
+            }
+            get length() {
+                // 计算向量的模
+                return Math.hypot(this.x, this.y);
+            }
+            get dir() {
+                // 计算向量的旋转的弧度
+                return Math.atan2(this.y, this.x);
+            }
+            copy() {
+                // 复制坐标向量
+                return new Vector2D(this.x, this.y);
+            }
+            // 坐标向量相加
+            add(v) {
+                this.x += v.x;
+                this.y += v.y;
+                return this;
+            }
+            // 坐标向量相减
+            sub(v) {
+                this.x -= v.x;
+                this.y -= v.y;
+                return this;
+            }
+            // 倍数延长坐标向量
+            scale(a) {
+                this.x *= a;
+                this.y *= a;
+                return this;
+            }
+            // 向量叉乘的模
+            cross(v) {
+                return this.x * v.y - v.x * this.y;
+            }
+            // 向量点乘的值
+            dot(v) {
+                return this.x * v.x + v.y * this.y;
+            }
+            // 向量归一化（向量除以向量的模）
+            normalize() {
+                return this.scale(1 / this.length);
+            }
+            // 向量旋转
+            rotate(rad) {
+                const c = Math.cos(rad),
+                s = Math.sin(rad);
+                const [x, y] = this;
+
+                this.x = x * c + y * -s;
+                this.y = x * s + y * c;
+
+                return this;
+            }
+        }
+        
+        // 根据点来绘制图形
+        function draw(context, points,strokeStyle, fillStyle, {
+            close = true,
+            rule = 'evenodd',
+        } = {}) {
+            context.strokeStyle = strokeStyle;
+            context.beginPath();
+            context.moveTo(...points[0]);
+            for(let i = 1; i < points.length; i++) {
+                context.lineTo(...points[i]);
+            }
+            context.closePath();
+            if(fillStyle) {
+                context.fillStyle = fillStyle;
+                context.fill(rule);
+            }
+            context.stroke();
+        }
+
+        // 不规则多边形的顶点数组
+        const vertices = [
+            [-0.7, 0.5],
+            [-0.4, 0.3],
+            [-0.25, 0.71],
+            [-0.1, 0.56],
+            [-0.1, 0.13],
+            [0.4, 0.21],
+            [0, -0.6],
+            [-0.3, -0.3],
+            [-0.6, -0.3],
+            [-0.45, 0.0],
+        ];
+        const poitions = vertices.map(([x, y]) => [x * 256, y * 256]);
+
+        draw(ctx, poitions, 'transparent', 'red');
+        draw(ctx, [[100, 100], [100, 200], [150, 200]], 'transparent', 'blue');
+
+        // 获取canvas在可视区域内的位置
+        const {left, top} = canvas.getBoundingClientRect();
+
+        /** 1.第一种方法：canvas的isPointInPath方法只会判断最后一次绘制的路径，所以存在问题*/
+        // canvas.addEventListener('mousemove', (evt) => {
+        //     const {x, y} = evt;
+        //     // 坐标转换
+        //     const offsetX = x - left;
+        //     const offsetY = y - top;
+
+        //     ctx.clearRect(-256, -256, 512, 512);
+
+        //     if(ctx.isPointInPath(offsetX, offsetY)) {
+        //         draw(ctx, poitions, 'transparent', 'green');
+        //         draw(ctx, [[100, 100], [100, 200], [150, 200]], 'transparent', 'orange');
+        //     } else {
+        //         draw(ctx, poitions, 'transparent', 'red');
+        //         draw(ctx, [[100, 100], [100, 200], [150, 200]], 'transparent', 'blue');
+        //     }
+        // });
+        
+
+        /**自己实现isPointInPath方法，重新绘制*/
+        // function isPointInPath(ctx, x, y) {
+        //     // 我们根据ctx重新clone一个新的canvas对象出来
+        //     const cloned = ctx.canvas.cloneNode().getContext('2d');
+        //     cloned.translate(canvas.width/2, canvas.height/2);
+        //     cloned.scale(1, -1);
+        //     let ret = false;
+        //     // 绘制多边形c，然后判断点是否在图形内部
+        //     draw(cloned, poitions, 'transparent', 'red');
+        //     ret |= cloned.isPointInPath(x, y);
+        //     if(!ret) {
+        //         // 如果不在，在绘制小三角形，然后判断点是否在图形内部
+        //         draw(cloned, [[100, 100], [100, 200], [150, 200]], 'transparent', 'blue');
+        //         ret |= cloned.isPointInPath(x, y);
+        //     }
+        //     return ret;
+        // }
+        // // 2.第二种方法：每次都重新绘制所有的路径，每个都要判断，不通用，并且繁琐
+        // canvas.addEventListener('mousemove', (evt) => {
+        //     const {x, y} = evt;
+        //     // 坐标转换
+        //     const offsetX = x - left;
+        //     const offsetY = y - top;
+
+        //     ctx.clearRect(-256, -256, 512, 512);
+
+        //     if(isPointInPath(ctx,offsetX, offsetY)) {
+        //         draw(ctx, poitions, 'transparent', 'green');
+        //         draw(ctx, [[100, 100], [100, 200], [150, 200]], 'transparent', 'orange');
+        //     } else {
+        //         draw(ctx, poitions, 'transparent', 'red');
+        //         draw(ctx, [[100, 100], [100, 200], [150, 200]], 'transparent', 'blue');
+        //     }
+        // });
+
+
+        /**
+         * 3. 判断点是否在三角形内部的方法
+         * 通过向量叉乘的方法判断，几何图形（多边形）可以看成都是基本三角形组成的，三角形的三条边是向量a，b，c；
+         * 三角形外一点u，到三角形顶点的向量是u1，u2，u3。     u1×a、u2×b、u3×c的方向相同
+         * 
+         * */ 
+        
+        function inTriangle(p1, p2, p3, point) {
+            // 获取三角形三个顶点的向量表示
+            const a = p2.copy().sub(p1);
+            const b = p3.copy().sub(p2);
+            const c = p1.copy().sub(p3);
+
+            // 获取平面上一点到三角形三个顶点的向量表示
+            const u1 = point.copy().sub(p1);
+            const u2 = point.copy().sub(p2);
+            const u3 = point.copy().sub(p3);
+
+            // 判断 向量a与u1的叉积 的值的正负
+            const s1 = Math.sign(a.cross(u1));
+            // 获取 向量a与u1的点积的相关算法（向量U1落在向量a上的距离与a的模的比值）的值
+            let p = a.dot(u1) / a.length ** 2;
+            // 通过向量叉积判断是否等于0，与通过向量点积判断比值，最终判断点是否落在三角形的某条边上
+            if(s1 === 0 && p >= 0 && p <= 1) return true;
+            // 与上同理
+            const s2 = Math.sign(b.cross(u2));
+            p = b.dot(u2) / b.length ** 2;
+            if(s2 === 0 && p >= 0 && p <= 1) return true;
+            // 与上同理
+            const s3 = Math.sign(c.cross(u3));
+            p = c.dot(u3) / c.length ** 2;
+            if(s3 === 0 && p >= 0 && p <= 1) return true;
+
+            // 如果点不在三角形的边上，name判断向量叉积的方向是否相同
+            return s1 === s2 && s2 === s3;
+        }
+        /**
+         * 实现通用的 isPointInPath 方法
+         * 通过三角剖分，将多边形切割成多个三角形
+         * 
+        */
+        function isPointInPath({vertices, cells}, point) {
+            let ret = false;
+            for(let i = 0; i < cells.length; i += 3) {
+                const p1 = new Vector2D(...vertices[cells[i]]);
+                const p2 = new Vector2D(...vertices[cells[i + 1]]);
+                const p3 = new Vector2D(...vertices[cells[i + 2]]);
+                if(inTriangle(p1, p2, p3, point)) {
+                    ret = true;
+                    break;
+                }
+            }
+            return ret;
+        }
+        // 进行三角剖分；triangles是下标数组，这个数组的值是顶点数组vertices数据的 index
+        const cells = earcut(vertices);
+
+        canvas.addEventListener('mousemove', (evt) => {
+            const {x, y} = evt;
+            // 坐标转换
+            const offsetX = x - left;
+            const offsetY = y - top;
+
+            ctx.clearRect(-256, -256, 512, 512);
+
+            const point = new Vector2D(offsetX, offsetY);
+
+            console.log(isPointInPath({vertices, cells},point))
+
+            if(isPointInPath({vertices, cells},point)) {
+                draw(ctx, poitions, 'transparent', 'green');
+                draw(ctx, [[100, 100], [100, 200], [150, 200]], 'transparent', 'orange');
+            } else {
+                draw(ctx, poitions, 'transparent', 'red');
+                draw(ctx, [[100, 100], [100, 200], [150, 200]], 'transparent', 'blue');
+            }
+        });
+
+    </script>
+</body>
+</html>
