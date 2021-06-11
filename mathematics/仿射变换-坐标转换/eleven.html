@@ -18,7 +18,6 @@
 
     <script type="module">
         // 导入进行三角剖分的库
-        import { earcut } from '../common/lib/earcut.js';
         import { Vector2D } from '../common/lib/utils.js';
 
         
@@ -47,9 +46,9 @@
                     offset.x, offset.y, 1.0
                 );
                 mat3 rotateMatrix = mat3(
-                    cos(rad), sin(rad), 0.0,
-                    -sin(rad), cos(rad), 0.0,
-                    0.0, 0.0, 1.0
+                    cos(rad), -sin(rad), 0.0,
+                    sin(rad), cos(rad),  0.0,
+                    0.0,      0.0,       1.0
                 );
                 mat3 scaleMatrix = mat3(
                     scale, 0.0, 0.0,
@@ -72,7 +71,7 @@
             {
                 gl_FragColor.xyz = u_color.xyz;
                 gl_FragColor.a = (1.0 - vP) * u_color.a;
-            }     
+            }
         `;
         
         // 创建顶点着色器对象

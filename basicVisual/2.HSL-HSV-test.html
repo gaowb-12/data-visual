@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.HSL 和 HSV </title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="800" height="800"></canvas>
+
+    <script type="module">
+        import { Vec3 } from "/common/lib/math/Vec3.js";
+        let canvas = document.querySelector("canvas");
+        let ctx = canvas.getContext("2d");
+        
+        // rgb颜色和hsl颜色互转规则
+        `
+            vec3 rgb2hsv(vec3 c){
+                vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+                vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+                vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+                float d = q.x - min(q.w, q.y);
+                float e = 1.0e-10;
+                return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+            }
+
+            vec3 hsv2rgb(vec3 c){
+                vec3 rgb = clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0), 6.0)-3.0)-1.0, 0.0, 1.0);
+                rgb = rgb * rgb * (3.0 - 2.0 * rgb);
+                return c.z * mix(vec3(1.0), rgb, c.y);
+            }
+        `
+        // 1. hsl/hsv颜色表示法
+        // function randomColor() {
+        //     return new Vec3(
+        //         0.5 * Math.random(), // 初始色相随机取0~0.5之间的值
+        //         0.7,  // 初始饱和度0.7
+        //         0.45,  // 初始亮度0.45
+        //     );
+        // }
+
+        ctx.translate(256, 256);
+        ctx.scale(1, -1);
+
+        // const [h, s, l] = randomColor();
+        // for(let i = 0; i < 3; i++) {
+        //     const p = (i * 0.25 + h) % 1;
+        //     for(let j = 0; j < 5; j++) {
+        //         const d = j - 2;
+        //         ctx.fillStyle = `hsl(${Math.floor(p * 360)}, ${Math.floor((0.15 * d + s) * 100)}%, ${Math.floor((0.12 * d + l) * 100)}%)`;
+        //         ctx.beginPath();
+        //         ctx.arc((j - 2) * 60, (i - 1) * 60, 20, 0, Math.PI * 2);
+        //         ctx.fill();
+        //     }
+        // }
+
+        // 2. HSL 和 HSV 的局限性
+        for(let i = 0; i < 20; i++) {
+            ctx.fillStyle = `hsl(${Math.floor(i * 15)}, 50%, 50%)`;
+            ctx.beginPath();
+            ctx.arc((i - 10) * 20, 60, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        for(let i = 0; i < 20; i++) {
+            ctx.fillStyle = `hsl(${Math.floor((i % 2 ? 60 : 210) + 3 * i)}, 50%, 50%)`;
+            ctx.beginPath();
+            ctx.arc((i - 10) * 20, -60, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+
+
+    </script>
+</body>
+</html>

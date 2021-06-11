@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3.CIE Lab 和 CIE Lch 颜色</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="800" height="800"></canvas>
+    <script src="//lib.baomitu.com/d3/4.10.2/d3.js"></script>
+    <script type="module">
+        import { Vec3 } from "/common/lib/math/Vec3.js";
+        let canvas = document.querySelector("canvas");
+        let ctx = canvas.getContext("2d");
+
+        ctx.translate(256, 256);
+        ctx.scale(1, -1);
+        
+        /* global d3 */
+        for(let i = 0; i < 20; i++) {
+            const c = d3.lab(30, i * 15 - 150, i * 15 - 150).rgb();
+            ctx.fillStyle = `rgb(${c.r}, ${c.g}, ${c.b})`;
+            ctx.beginPath();
+            ctx.arc((i - 10) * 20, 60, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        for(let i = 0; i < 20; i++) {
+            const c = d3.lab(i * 5, 80, 80).rgb();
+            ctx.fillStyle = `rgb(${c.r}, ${c.g}, ${c.b})`;
+            ctx.beginPath();
+            ctx.arc((i - 10) * 20, -60, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+    </script>
+</body>
+</html>
