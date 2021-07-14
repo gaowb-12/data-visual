@@ -55,6 +55,14 @@
             uniform float scale;
             uniform int iterations;
 
+            vec3 palette(float t, vec3 c1, vec3 c2, vec3 c3, vec3 c4) {
+                float x = 1.0 / 3.0;
+                if (t < x) return mix(c1, c2, t/x);
+                else if (t < 2.0 * x) return mix(c2, c3, (t - x)/x);
+                else if (t < 3.0 * x) return mix(c3, c4, (t - 2.0*x)/x);
+                return c4;
+            }
+
             // 分形公式（矩阵乘法表示两个复数相乘）
             vec2 f(vec2 z, vec2 c){
                 return mat2(z, -z.y, z.x) * z + c;
@@ -80,7 +88,8 @@
                         break;
                     }
                 }
-                gl_FragColor.rgb = escaped ? vec3(float(j)) / float(iterations) : vec3(0.0);
+                gl_FragColor.rgb = escaped ? max(1.0, log(scale)) * palette(float(j)/ float(iterations), vec3(0.02, 0.02, 0.03), vec3(0.1, 0.2, 0.3), vec3(0.0, 0.3, 0.2), vec3(0.0, 0.5, 0.8))
+                     : vec3(0.0);
                 gl_FragColor.a = 1.0;
             }
         `
@@ -89,7 +98,7 @@
         renderer.useProgram(program)
         
         // 第三步：
-        renderer.uniforms.center = [0.0,0.0];
+        renderer.uniforms.center = [0.367, 0.303];
         renderer.uniforms.scale = 1.0;
         renderer.uniforms.iterations = 256;
 
@@ -119,7 +128,17 @@
         ])
 
         // 第五步：
-        renderer.render()
+        renderer.render();
+
+
+        function update(){
+            var factor = Math.max(0.1,Math.log(renderer.uniforms.scale));
+            renderer.uniforms.scale = (renderer.uniforms.scale += factor) % 10000;
+            renderer.uniforms.iterations = factor*500;
+
+            requestAnimationFrame(update)
+        }
+        setTimeout(update, 1000);
     </script>
 </body>
 </html>
