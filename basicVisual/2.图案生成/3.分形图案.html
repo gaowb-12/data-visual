@@ -50,7 +50,7 @@
          * step(st.x, 0.9)：step阶梯函数，第一个参数大于第二个参数时返回0，否则1，这样实现片元着色器的阶梯式的颜色插值
          * mix(vec3(0.8), vec3(1.0), d1 * d2)：实现线性插值，当st.x<0.9并且st.y>0.1时，返回vec3(1.0)白色，否则vec3(0.8)灰色
          */ 
-         const fragment = `
+        const fragment = `
             #ifdef GL_ES
             precision highp float;
             #endif
@@ -80,8 +80,8 @@
                     j = i;
                     z = f(z, c);
                     if (length(z) > 2.0) {
-                    escaped = true;
-                    break;
+                        escaped = true;
+                        break;
                     }
                 }
                 // gl_FragColor.rgb = escaped ? vec3(1.0) : vec3(0.0);
