@@ -88,12 +88,13 @@
             precision highp float;
             #endif
 
+            uniform float r;
             uniform float utime;
             uniform int rows;
             varying vec2 vUv;
             
             float random(vec2 st){
-                return fract(sin(dot(st.xy, vec2(12.9898,78.233)))* 43758.5453123);
+                return fract(sin(dot(st.xy, vec2(12.9898,78.233)))* 43758.5453123) * r;
             }
             
             vec2 truchetPattern(vec2 st, float index){
@@ -101,7 +102,7 @@
                     st = vec2(1.0)-st;
                 }else if(index > 0.5){
                     st = vec2(1.0-st.x,st.y);
-                }else if(index > 0.25){
+                }else if(index > 0.1){
                     st = vec2(st.x,1.0-st.y);
                 }
                 return st;
@@ -130,6 +131,7 @@
         // 第三步：
         renderer.uniforms.utime = 1
         renderer.uniforms.rows = 20
+        renderer.uniforms.r = Math.random()
 
         // 第四步：
         renderer.setMeshData([
