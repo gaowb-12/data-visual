@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1.灰度化图片</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="0" height="0"></canvas>
+
+    <script type="module">
+        // 加载图片
+        function loadImage(src){
+            const image = new Image();
+            image.crossOrigin = "anonymous"
+            return new Promise(function(resolve){
+                image.onload = function(){
+                    resolve(image)
+                }
+                image.src = src
+            })
+        }
+        
+        /***
+         *  图片灰度化处理
+         *  imageData：有data属性，是个类型数组，每 4 个元素组成一个像素的信息（r、g、b、a）
+         */
+        function grayImage(canvas,imageData){
+            let data = imageData.data
+            for(let i = 0; i < canvas.width * canvas.height * 4; i += 4){
+                // 读取每个像素的 RGBA 四通道的值
+                let r = data[i],
+                g = data[i+1],
+                b = data[i+2],
+                a = data[i+3];
+
+                // 加权处理
+                let v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                data[i] = v;
+                data[i+1] = v;
+                data[i+2] = v;
+                data[i+3] = a;
+            }
+        }
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+
+        (async function(){
+            // 异步加载图片
+            let img = await loadImage('https://p2.ssl.qhimg.com/d/inn/4b7e384c55dc/girl1.jpg');
+            const { width, height } = img
+            // 将图片绘制到 canvas
+            canvas.width = width
+            canvas.height = height
+            ctx.drawImage(img,0,0);
+            // 获取图片剪裁区的数据 imgData（包含了图片的所有像素数据）
+            const imageData = ctx.getImageData(0,0,canvas.width,canvas.height)
+            
+            grayImage(canvas,imageData);
+            ctx.putImageData(imageData,0,0);
+            
+        })()
+
+
+    </script>
+</body>
+</html>
