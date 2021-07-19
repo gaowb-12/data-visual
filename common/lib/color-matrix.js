@@ -1,21 +1,19 @@
-
 export function clamp(value, min, max) {
-    if(min > max) [min, max] = [max, min];
-    if(value < min) return min;
-    if(value > max) return max;
-    return value;
-  }
-  
-  export function mix(src, dest, p) {
-    return src * (1 - p) + dest * p;
-  }
-  
-  export function transformPoint(p, m) {
-    const [x, y] = p;
-    return [x * m[0] + y * m[2] + m[4], x * m[1] + y * m[3] + m[5]];
-  }
+  if(min > max) [min, max] = [max, min];
+  if(value < min) return min;
+  if(value > max) return max;
+  return value;
+}
 
-// 将 color 通过颜色矩阵映射成新的色值返回
+export function mix(src, dest, p) {
+  return src * (1 - p) + dest * p;
+}
+
+export function transformPoint(p, m) {
+  const [x, y] = p;
+  return [x * m[0] + y * m[2] + m[4], x * m[1] + y * m[3] + m[5]];
+}
+
 export function transformColor(color, ...matrix) {
   const [r, g, b, a] = color;
   matrix = matrix.reduce((m1, m2) => multiply(m1, m2));
@@ -25,7 +23,7 @@ export function transformColor(color, ...matrix) {
   color[3] = matrix[15] * r + matrix[16] * g + matrix[17] * b + matrix[18] * a + matrix[19];
   return color;
 }
-// 将颜色矩阵相乘
+
 export function multiply(a, b) {
   const out = [];
   const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3], a04 = a[4]; // eslint-disable-line one-var-declaration-per-line
@@ -120,16 +118,6 @@ export function contrast(p) {
     0, 0, p, 0, d,
     0, 0, 0, 1, 0,
   ];
-}
-
-
-export function channel({r = 1, g = 1, b = 1}) {
-    return [
-      r, 0, 0, 0, 0,
-      0, g, 0, 0, 0,
-      0, 0, b, 0, 0,
-      0, 0, 0, 1, 0,
-    ];
 }
 
 export function invert(p) {

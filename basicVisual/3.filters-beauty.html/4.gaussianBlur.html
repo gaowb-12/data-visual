@@ -18,33 +18,38 @@
 
     <script type="module">
 
-        import { loadImage, getImageData, traverse } from "/common/lib/utils.js"
-        import { transformColor, multiply, grayscale, channel, brightness, saturate } from "/common/lib/color-matrix.js"
+        import { loadImage, getImageData, traverse, gaussianBlur } from "/common/lib/utils.js"
+        import { transformColor, multiply, grayscale, brightness, saturate, contrast } from "/common/lib/color-matrix.js"
 
         const canvas = document.querySelector('canvas'); 
         const context = canvas.getContext('2d');
 
-        (async function(){
+        (async function (){
             // 异步加载图片
-            let img = await loadImage('https://p2.ssl.qhimg.com/d/inn/4b7e384c55dc/girl1.jpg');
+            // let img = await loadImage('https://p2.ssl.qhimg.com/d/inn/4b7e384c55dc/girl1.jpg');
+            const img = await loadImage('assets/girl2.jpg');
             
             // 获取图片剪裁区的数据 imgData（包含了图片的所有像素数据）
-            const imageData = getImageData(img)
-            
+            const imageData = getImageData(img);
+
+            // 对imageData应用高斯模糊 
+            gaussianBlur(imageData.data, imageData.width, imageData.height, 4);
+
             // 循环遍历 imageData 数据，并处理
             traverse(imageData,({r, g, b, a}) => { 
                 // 对每个像素进行灰度化处理
                 return transformColor(
                     [r,g,b,a],
-                    channel({r: 1.2}), // 增强红色通道 
                     brightness(1.2), // 增强亮度 
                     saturate(1.2), // 增强饱和度
+                    grayscale(0.5), 
+                    contrast(1.1), 
                 )
             });
-            canvas.width = img.width
-            canvas.height = img.height
-            context.putImageData(imageData,0,0)
-        })()
+            canvas.width = imageData.width;
+            canvas.height = imageData.height;
+            context.putImageData(imageData, 0, 0);
+        })();
 
 
     </script>

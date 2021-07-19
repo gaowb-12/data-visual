@@ -142,3 +142,95 @@ export function traverse(imageData, pass) {
     }
     return imageData;
 }
+
+
+// 高斯权重矩阵（计算权重分布情况）
+function gaussianMatrix(radius, sigma = radius / 3){
+    // 高斯分布的一维公式
+    const a = 1 / (Math.sqrt(2 * Math.PI) * sigma);
+    const b = -1 / (2 * sigma ** 2);
+
+    let sum = 0;
+    const matrix = [];
+    // 模糊半径内的所有像素点进行高斯分布权重计算
+    for (let x = -radius; x <= radius; x++) {
+        let g = a * Math.exp(b * x ** 2);
+        matrix.push(g);
+        sum += g;
+    }
+    // 所有像素点的权重之和为1
+    for(let i = 0; i<matrix.length; i++){
+        matrix[i] /= sum;
+    }
+    return { matrix, sum }
+}
+
+/**
+  * 高斯模糊
+  * @param  {Array} pixes  pix array
+  * @param  {Number} width 图片的宽度
+  * @param  {Number} height 图片的高度
+  * @param  {Number} radius 取样区域半径, 正数, 可选, 默认为 3.0
+  * @param  {Number} sigma 标准方差, 可选, 默认取值为 radius / 3
+  * @return {Array}
+  */
+export function gaussianBlur(pixels, width, height, radius = 3, sigma = radius / 3){
+    // 获取模糊半径范围内的高斯模糊权重矩阵
+    const { matrix, sum } = gaussianMatrix(radius, sigma);
+
+    // 1.对x方向做高斯模糊运算
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            let r = 0, g = 0, b = 0;
+            // 对高斯模糊半径范围内的x方向像素点进行计算
+            for (let j = -radius; j <= radius; j++) {
+                //像素点的范围
+                const k = x + j;
+                // 像素点的范围处于当前像素集合pixels范围内
+                if(k > 0 && k < width){
+                    // 当前要处理的第i个像素点
+                    let i = (width * y + k) * 4;
+                    // j + radius 是当前像素点的权重在权重矩阵中的位置
+                    r += pixels[i] * matrix[j + radius];
+                    g += pixels[i+1] * matrix[j + radius];
+                    b += pixels[i+2] * matrix[j + radius];
+                }
+            }
+            // 当前x方向的像素点在像素集合pixels中的位置
+            const i = (width * y + x) * 4;
+            // 除以 sum 是为了消除处于边缘的像素, 高斯运算不足的问题
+            pixels[i] = r / sum;
+            pixels[i+1] = g / sum;
+            pixels[i+2] = b / sum;
+            
+        }
+    }
+
+    // 2.对y方向做高斯模糊运算
+    for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+            let r = 0, g = 0, b = 0;
+            // 对高斯模糊半径范围内的x方向像素点进行计算
+            for (let j = -radius; j <= radius; j++) {
+                //像素点的范围
+                const k = y + j;
+                // 像素点的范围处于当前像素集合pixels范围内
+                if(k > 0 && k < height){
+                    // 当前要处理的第i个像素点
+                    let i = (width * k + x) * 4;
+                    // j + radius 是当前像素点的权重在权重矩阵中的位置
+                    r += pixels[i] * matrix[j + radius];
+                    g += pixels[i+1] * matrix[j + radius];
+                    b += pixels[i+2] * matrix[j + radius];
+                }
+            }
+            // 当前x方向的像素点在像素集合pixels中的位置
+            const i = (width * y + x) * 4;
+            // 除以 sum 是为了消除处于边缘的像素, 高斯运算不足的问题
+            pixels[i] = r / sum;
+            pixels[i+1] = g / sum;
+            pixels[i+2] = b / sum;
+        }
+    }
+    return pixels;
+}
