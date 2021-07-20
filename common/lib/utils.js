@@ -128,19 +128,28 @@ export function traverse(imageData, pass) {
     const {width, height, data} = imageData;
     for(let i = 0; i < width * height * 4; i += 4) {
         const [r, g, b, a] = pass({
-            r: data[i] / 255,
+            r: data[i] / 255,//颜色归一化处理
             g: data[i + 1] / 255,
             b: data[i + 2] / 255,
             a: data[i + 3] / 255,
             index: i,
             width,
             height,
-            x: ((i / 4) % width) / width,
-            y: Math.floor(i / 4 / width) / height
+            x: ((i / 4) % width) / width,// 坐标点占x轴的比例（0-1）
+            y: Math.floor(i / 4 / width) / height, // 坐标点占y轴的比例（0-1）
         });
         data.set([r, g, b, a].map(v => Math.round(v * 255)), i);
     }
     return imageData;
+}
+
+export function getPixel(imageData, index) {
+    const {data} = imageData;
+    const r = data[index] / 255,
+        g = data[index + 1] / 255,
+        b = data[index + 2] / 255,
+        a = data[index + 3] / 255;
+    return [r, g, b, a];
 }
 
 
