@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3.片元着色器处理像素</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="1000" height="554"></canvas>
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        import { loadImage } from "/common/lib/utils.js";
+
+        (async function(){
+            /**
+             * gl-renderer 在 WebGL 底层的基础上进行了一些简单的封装，以便于我们将重点放在提供几何数据、设置变量和编写 Shader 上，不用因为创建 buffer 等细节而分心
+             * 第一步: 创建 Renderer 对象
+             * 第二步: 创建并启用 WebGL 程序
+             * 第三步: 设置 uniform 变量
+             * 第四步: 将顶点数据送入缓冲区
+             * 第五步: 渲染
+            */
+            const canvas = document.querySelector('canvas'); 
+            const renderer = new GlRenderer(canvas);
+    
+            // /**
+            //  * 加载纹理
+            //  * 1.创建纹理对象
+            // */
+            // function createTexture(gl, img){
+            //     // 创建纹理对象
+            //     const texture = gl.createTexture();
+            //     // 设置预处理函数，由于图片坐标系和webgl坐标系的Y轴是反的，这个设置可以将图片Y坐标翻转一下
+            //     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+            //     // 激活指定纹理单元，webgl有多个纹理单元，因此在shader中可以使用多个纹理
+            //     gl.activeTexture(gl.TEXTURE0);
+            //     // 将纹理绑定到当前上下文
+            //     gl.bindTexture(gl.TEXTURE_2D,texture);
+            //     // 指定纹理图像
+            //     gl.texImage2D(gl.TEXTURE_2D,0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            //     // 设置纹理的一些参数
+            //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); 
+            //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); 
+            //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            //     // 解除纹理绑定 
+            //     gl.bindTexture(gl.TEXTURE_2D, null); 
+            //     return texture;
+            // }
+            // /**
+            //  * 加载纹理
+            //  * 2.设置纹理
+            // */
+            // function setTexture(gl, idx) {
+            //     // 激活纹理单元
+            //     gl.activeTexture(gl.TEXTURE0 + idx);
+            //     // 绑定纹理
+            //     gl.bindTexture(gl.TEXTURE_2D, texture);
+            //     // 获取shader中纹理变量
+            //     const loc = gl.getUniformLocation(program, 'tMap');
+            //     // 将对应的纹理单元写入shader变量
+            //     gl.uniform1i(loc, idx);
+            //     // 解除纹理绑定
+            //     gl.bindTexture(gl.TEXTURE_2D, null);
+            // }
+            
+            // 第二步
+
+            const vertex = `
+                attribute vec2 a_vertexPosition;
+                attribute vec2 uv;
+                varying vec2 vUv;
+                
+                void main() {
+                    gl_PointSize = 1.0;
+                    vUv = uv;
+                    gl_Position = vec4(a_vertexPosition, 1, 1);
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                precision mediump float;
+                #endif
+
+                uniform sampler2D tMap;
+                varying vec2 vUv;
+
+                void main() {
+
+                    gl_FragColor = texture2D(tMap, vUv);
+                }
+            `;
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+    
+            // 第三步
+            const texture = await renderer.loadTexture("https://p1.ssl.qhimg.com/t01cca5849c98837396.jpg");
+            renderer.uniforms.tMap = texture;
+
+            // 第四步
+            renderer.setMeshData([
+                {
+                    positions:[
+                        [-1, -1], 
+                        [-1, 1], 
+                        [1, 1], 
+                        [1, -1]
+                    ],
+                    attributes:{
+                        uv:[
+                            [0, 0], 
+                            [0, 1], 
+                            [1, 1], 
+                            [1, 0],
+                        ]
+                    },
+                    cells:[[0,1,2],[2,0,3]]
+                }
+            ])
+
+            // 第五步
+            renderer.render()
+
+        })()
+        
+    </script>
+</body>
+</html>
