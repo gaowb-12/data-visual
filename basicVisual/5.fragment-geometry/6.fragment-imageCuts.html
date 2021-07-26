@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>4.片元着色器-绘制三角形</title>
+    <title>6.片元着色器-图像三角形裁剪</title>
     <style>
         canvas{
             border:1px solid #aaa;
@@ -14,7 +14,7 @@
     </style>
 </head>
 <body>
-    <canvas width="500" height="500"></canvas>
+    <canvas width="554" height="554"></canvas>
     <script src="/common/lib/gl-renderer.js"></script>
     <script type="module">
         import { loadImage } from "/common/lib/utils.js";
@@ -30,9 +30,8 @@
             */
             const canvas = document.querySelector('canvas'); 
             const renderer = new GlRenderer(canvas);
-            
-            // 第二步
 
+            // 第二步
             const vertex = `
                 attribute vec2 a_vertexPosition;
                 attribute vec2 uv;
@@ -46,9 +45,11 @@
             `;
             const fragment = `
                 #ifdef GL_ES
-                precision highp float;
+                precision mediump float;
                 #endif
 
+                uniform sampler2D tMap;
+                uniform float uTime;
                 varying vec2 vUv;
 
                 // 计算点到三角形三条边的距离
@@ -86,17 +87,28 @@
                 }
 
                 void main() {
-                    float d = triangle_distance(vUv, vec2(0.3), vec2(0.5, 0.7), vec2(0.7, 0.3));
-                    gl_FragColor.rgb = (1.0 - smoothstep(0.0, 0.01, d)) * vec3(1.0);
-                    gl_FragColor.a = 1.0;
+                    vec4 color = texture2D(tMap, vUv);
+                    vec2 uv = vUv - vec2(0.5);
+                    vec2 a = vec2(-0.577, 0) - vec2(0.5); 
+                    vec2 b = vec2(0.5, 1.866) - vec2(0.5); 
+                    vec2 c = vec2(1.577, 0) - vec2(0.5);
+
+                    float scale = min(1.0, 0.0005 * uTime);
+                    float d = triangle_distance(uv, scale * a, scale * b, scale * c);
+                    gl_FragColor.rgb = (1.0 - smoothstep(0.0, 0.01, d)) * vec3(color.rgb);
+                    gl_FragColor.a = color.a;
                 }
             `;
             const program = renderer.compileSync(fragment,vertex);
             renderer.useProgram(program);
     
             // 第三步
-            renderer.uniforms.uMouse = [0.5,1.0];
-            renderer.uniforms.uOrigin = [0.5,0.5];
+            const texture = await renderer.loadTexture("https://p1.ssl.qhimg.com/t01cca5849c98837396.jpg");
+            renderer.uniforms.tMap = texture;
+            renderer.uniforms.uTime = 0;
+            
+            // 通过给片元着色器传入颜色矩阵变量实现图片灰度化
+            const r = 0.2126, g = 0.7152, b = 0.0722;
 
             // 第四步
             renderer.setMeshData([
@@ -122,11 +134,14 @@
             // 第五步
             renderer.render()
 
-            // 鼠标控制直线
-            canvas.addEventListener('mousemove', (e) => { 
-                const {x, y, width, height} = e.target.getBoundingClientRect(); 
-                renderer.uniforms.uMouse = [ (e.x - x) / width, 1.0 - (e.y - y) / height, ];
-            });
+
+            // 时间变化
+            function update(utime){
+                renderer.uniforms.uTime = utime;
+                requestAnimationFrame(update);
+            }
+            update(0)
+
         })()
         
     </script>
