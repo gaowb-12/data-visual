@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>6.片元着色器-图像三角形裁剪动画</title>
+    <title>7.片元着色器-动态进度条</title>
     <style>
         canvas{
             border:1px solid #aaa;
@@ -51,51 +51,37 @@
                 uniform sampler2D tMap;
                 uniform float uTime;
                 varying vec2 vUv;
-
-                // 计算点到三角形三条边的距离
-                float line_distance(in vec2 st, in vec2 a, in vec2 b) {
-                    vec3 ab = vec3(b - a, 0);
-                    vec3 p = vec3(st - a, 0);
-                    float l = length(ab);
-                    // 通过二维向量的叉乘，z轴的正负就表示方向，通过正负判断点是否在三角形内部
-                    return cross(p, normalize(ab)).z;
-                }
-
-                // 计算点到线段的距离（有边界判断）
-                float seg_distance(in vec2 st, in vec2 a, in vec2 b) {
-                    vec3 ab = vec3(b - a, 0);
-                    vec3 p = vec3(st - a, 0);
-                    float l = length(ab);
-                    float d = abs(cross(p, normalize(ab)).z);
-                    float proj = dot(p, ab) / l;
-                    if(proj >= 0.0 && proj <= l) return d;
-                    return min(distance(st, a), distance(st, b));
-                }
-
-                float triangle_distance(in vec2 st, in vec2 a, in vec2 b, in vec2 c) {
-                    // 计算坐标系上的点到三角形三条边的距离
-                    float d1 = line_distance(st, a, b);
-                    float d2 = line_distance(st, b, c);
-                    float d3 = line_distance(st, c, a);
-
-                    // 通过判断点到三角形三条边的正负判断点是否在三角形内部（内部符号相同）
-                    if(d1 >= 0.0 && d2 >= 0.0 && d3 >= 0.0 || d1 <= 0.0 && d2 <= 0.0 && d3 <= 0.0) {
-                        return -min(abs(d1), min(abs(d2), abs(d3))); // 内部距离为负
-                    }
-                    // 点在三角形外部时
-                    return min(seg_distance(st, a, b), min(seg_distance(st, b, c), seg_distance(st, c, a))); // 外部为正
-                }
-
+               
                 void main() {
                     vec4 color = texture2D(tMap, vUv);
+                    // 移动旋转中心到0.5处
                     vec2 uv = vUv - vec2(0.5);
-                    vec2 a = vec2(-0.577, 0) - vec2(0.5); 
-                    vec2 b = vec2(0.5, 1.866) - vec2(0.5); 
-                    vec2 c = vec2(1.577, 0) - vec2(0.5);
+                    vec2 a = vec2(0, 1);
+                    // 计算时间变化
+                    float time = 0.0005 * uTime;
 
-                    float scale = min(1.0, 0.0005 * uTime);
-                    float d = triangle_distance(uv, scale * a, scale * b, scale * c);
-                    gl_FragColor.rgb = (1.0 - smoothstep(0.0, 0.01, d)) * vec3(color.rgb);
+                    // b是计算旋转的弧度(注意x坐标是sin，y坐标是cos，这样相当于角度是顺时针变大的)
+                    vec2 b = vec2(sin(time), cos(time));
+                    float d = 0.0;
+
+                    // 计算叉乘之后法向量的值，法向量的方向能确定向量之间的位置关系
+                    // 第一个是归一化向量b与归一化向量a的叉乘
+                    float z1 = cross(vec3(b, 0.0), vec3(a, 0.0)).z;
+                    // 第二个是纹理坐标向量uv与归一化向量a的叉乘
+                    float z2 = cross(vec3(uv, 0.0), vec3(a, 0.0)).z;
+                    // 第三个是纹理坐标向量uv与归一化向量b的叉乘
+                    float z3 = cross(vec3(uv, 0.0), vec3(b, 0.0)).z;
+
+                    // 判断向量之间的位置关系
+                    if(z1 > 0.0 && z2 > 0.0 && z3 < 0.0){
+                        d = 1.0;
+                    }
+                    if(z1 < 0.0 && (z2 > 0.0 || z3 < 0.0)){
+                        d = 1.0;
+                    }
+
+                    gl_FragColor.rgb = color.rgb;
+                    gl_FragColor.r *= mix(0.3, 1.0, d);
                     gl_FragColor.a = color.a;
                 }
             `;
@@ -103,7 +89,7 @@
             renderer.useProgram(program);
     
             // 第三步
-            const texture = await renderer.loadTexture("https://p1.ssl.qhimg.com/t01cca5849c98837396.jpg");
+            const texture = await renderer.loadTexture("https://p4.ssl.qhimg.com/t011ce67c90abedcf12.jpg");
             renderer.uniforms.tMap = texture;
             renderer.uniforms.uTime = 0;
             
