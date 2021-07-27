@@ -243,3 +243,17 @@ export function gaussianBlur(pixels, width, height, radius = 3, sigma = radius /
     }
     return pixels;
 }
+
+// 直角坐标影射为极坐标
+export function toPolar(x, y) {
+    const r = Math.hypot(x, y);
+    const θ= Math.atan2(y, x);
+    return [r, θ];
+}
+
+// 极坐标映射为直角坐标
+export function fromPolar(r, θ) {
+    const x = r * Math.cos(θ);
+    const y = r * Math.sin(θ);
+    return [x, y];
+}
