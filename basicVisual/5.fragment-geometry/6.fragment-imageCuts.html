@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>6.片元着色器-图像三角形裁剪动画</title>
+    <title>6.片元着色器-图像三角形裁剪</title>
     <style>
         canvas{
             border:1px solid #aaa;
@@ -17,67 +17,133 @@
     <canvas width="554" height="554"></canvas>
     <script src="/common/lib/gl-renderer.js"></script>
     <script type="module">
-        import { loadImage, toPolar, fromPolar } from "/common/lib/utils.js";
-        
-        let canvas = document.querySelector("canvas");
-        let ctx = canvas.getContext("2d")
+        import { loadImage } from "/common/lib/utils.js";
 
-        // 1.设置坐标，坐标变换
-        ctx.translate(canvas.width/2, canvas.height/2);//将坐标原点平移到画布最底部
-        ctx.scale(1,-1);//翻转y轴，让y轴朝上
-        ctx.lineCap = 'round';// 定义线条末端线帽的样式
-        
-        // 根据点来绘制图形
-        function draw(points, context, {
-            strokeStyle = 'black',
-            fillStyle = null,
-            close = false,
-        } = {}) {
-            context.strokeStyle = strokeStyle;
-            context.beginPath();
-            context.moveTo(...points[0]);
-            for(let i = 1; i < points.length; i++) {
-                context.lineTo(...points[i]);
-            }
-            if(close) context.closePath();
-            if(fillStyle) {
-                context.fillStyle = fillStyle;
-                context.fill();
-            }
-            context.stroke();
-        }
+        (async function(){
+            /**
+             * gl-renderer 在 WebGL 底层的基础上进行了一些简单的封装，以便于我们将重点放在提供几何数据、设置变量和编写 Shader 上，不用因为创建 buffer 等细节而分心
+             * 第一步: 创建 Renderer 对象
+             * 第二步: 创建并启用 WebGL 程序
+             * 第三步: 设置 uniform 变量
+             * 第四步: 将顶点数据送入缓冲区
+             * 第五步: 渲染
+            */
+            const canvas = document.querySelector('canvas'); 
+            const renderer = new GlRenderer(canvas);
 
-        // 参数方程高阶函数
-        function parametric(xFunc, yFunc, rFunc) {
-            return function (start, end, seg = 100, ...args) {
-                const points = [];
-                for(let i = 0; i <= seg; i++) {
-                    const p = i / seg;
-                    const t = start * (1 - p) + end * p;
-                    const x = xFunc(t, ...args); // 计算参数方程组的x
-                    const y = yFunc(t, ...args);  // 计算参数方程组的y
-                    if(rFunc)
-                        // 转换坐标(其他坐标转换为直角坐标)
-                        points.push(rFunc(x, y));
-                    else
-                        points.push([x, y]);
+            // 第二步
+            const vertex = `
+                attribute vec2 a_vertexPosition;
+                attribute vec2 uv;
+                varying vec2 vUv;
+                
+                void main() {
+                    gl_PointSize = 1.0;
+                    vUv = uv;
+                    gl_Position = vec4(a_vertexPosition, 1, 1);
                 }
-                return {
-                    draw: draw.bind(null, points),
-                    points,
-                };
-            };
-        }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                precision mediump float;
+                #endif
 
-        const arc = parametric(
-            t => 200,
-            t => t,
-            fromPolar,
-        );
+                uniform sampler2D tMap;
+                uniform float uTime;
+                varying vec2 vUv;
 
-        arc(0, 2 * Math.PI).draw(ctx);
+                // 计算点到三角形三条边的距离
+                float line_distance(in vec2 st, in vec2 a, in vec2 b) {
+                    vec3 ab = vec3(b - a, 0);
+                    vec3 p = vec3(st - a, 0);
+                    float l = length(ab);
+                    // 通过二维向量的叉乘，z轴的正负就表示方向，通过正负判断点是否在三角形内部
+                    return cross(p, normalize(ab)).z;
+                }
+
+                // 计算点到线段的距离（有边界判断）
+                float seg_distance(in vec2 st, in vec2 a, in vec2 b) {
+                    vec3 ab = vec3(b - a, 0);
+                    vec3 p = vec3(st - a, 0);
+                    float l = length(ab);
+                    float d = abs(cross(p, normalize(ab)).z);
+                    float proj = dot(p, ab) / l;
+                    if(proj >= 0.0 && proj <= l) return d;
+                    return min(distance(st, a), distance(st, b));
+                }
+
+                float triangle_distance(in vec2 st, in vec2 a, in vec2 b, in vec2 c) {
+                    // 计算坐标系上的点到三角形三条边的距离
+                    float d1 = line_distance(st, a, b);
+                    float d2 = line_distance(st, b, c);
+                    float d3 = line_distance(st, c, a);
+
+                    // 通过判断点到三角形三条边的正负判断点是否在三角形内部（内部符号相同）
+                    if(d1 >= 0.0 && d2 >= 0.0 && d3 >= 0.0 || d1 <= 0.0 && d2 <= 0.0 && d3 <= 0.0) {
+                        return -min(abs(d1), min(abs(d2), abs(d3))); // 内部距离为负
+                    }
+                    // 点在三角形外部时
+                    return min(seg_distance(st, a, b), min(seg_distance(st, b, c), seg_distance(st, c, a))); // 外部为正
+                }
+
+                void main() {
+                    vec4 color = texture2D(tMap, vUv);
+                    vec2 uv = vUv - vec2(0.5);
+                    vec2 a = vec2(-0.577, 0) - vec2(0.5); 
+                    vec2 b = vec2(0.5, 1.866) - vec2(0.5); 
+                    vec2 c = vec2(1.577, 0) - vec2(0.5);
+
+                    float scale = min(1.0, 0.0005 * uTime);
+                    float d = triangle_distance(uv, scale * a, scale * b, scale * c);
+                    gl_FragColor.rgb = (1.0 - smoothstep(0.0, 0.01, d)) * vec3(color.rgb);
+                    gl_FragColor.a = color.a;
+                }
+            `;
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+    
+            // 第三步
+            const texture = await renderer.loadTexture("https://p1.ssl.qhimg.com/t01cca5849c98837396.jpg");
+            renderer.uniforms.tMap = texture;
+            renderer.uniforms.uTime = 0;
+            
+            // 通过给片元着色器传入颜色矩阵变量实现图片灰度化
+            const r = 0.2126, g = 0.7152, b = 0.0722;
+
+            // 第四步
+            renderer.setMeshData([
+                {
+                    positions:[
+                        [-1, -1], 
+                        [-1, 1], 
+                        [1, 1], 
+                        [1, -1]
+                    ],
+                    attributes:{
+                        uv:[
+                            [0, 0], 
+                            [0, 1], 
+                            [1, 1], 
+                            [1, 0],
+                        ]
+                    },
+                    cells:[[0,1,2],[2,0,3]]
+                }
+            ])
+
+            // 第五步
+            renderer.render()
 
 
+            // 时间变化
+            function update(utime){
+                renderer.uniforms.uTime = utime;
+                requestAnimationFrame(update);
+            }
+            update(0)
+
+        })()
+        
     </script>
 </body>
 </html>
