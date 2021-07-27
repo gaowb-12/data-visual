@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3.片元着色器与极坐标系绘制图案</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="554" height="554"></canvas>
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        import { loadImage, toPolar, fromPolar } from "/common/lib/utils.js";
+        
+        /**
+         * gl-renderer五步法
+         * 1.创建renderer对象
+         * 2.创建并启用webgl程序
+         * 3.设置uniform变量
+         * 4.将定点数据送入缓冲区
+         * 5.渲染
+         * 
+        */
+        // 1.
+        let canvas = document.querySelector("canvas");
+        const renderer = new GlRenderer(canvas);
+
+        // 2.
+        const vertex = `
+            attribute vec2 a_vertexPosition;
+            attribute vec2 uv;
+            varying vec2 vUv;
+
+            void main(){
+                gl_PointSize = 1.0;
+                vUv = uv;
+                gl_Position = vec4(a_vertexPosition, 1.0, 1.0);
+            }
+        `
+        // 圆
+        // const fragment = `
+        //     #ifdef GL_ES
+        //     precision mediump float;
+        //     #endif
+
+        //     uniform float uTime;
+        //     varying vec2 vUv;
+
+        //     // 直角坐标转换为极坐标
+        //     vec2 polar(vec2 st){
+        //         // 极径跟弧度
+        //         return vec2(length(st), atan(st.y, st.x));
+        //     }
+        //     void main(){
+        //         vec2 st = vUv - vec2(0.5);
+        //         // 坐标转换
+        //         st = polar(st);
+
+        //         // 根据极径的值画出相应半径的圆
+        //         gl_FragColor.rgb = smoothstep(st.x, st.x + 0.01, 0.2) * vec3(1.0);
+        //         gl_FragColor.a = 1.0;
+        //     }
+        // `
+        // 玫瑰曲线 ρ = a * cos(k * t)
+        // const fragment = `
+        //     #ifdef GL_ES
+        //     precision mediump float;
+        //     #endif
+
+        //     uniform float num;
+        //     varying vec2 vUv;
+
+        //     vec2 polar(vec2 st){
+        //         // 极径跟弧度
+        //         return vec2(length(st), atan(st.y, st.x));
+        //     }
+
+        //     void main(){
+        //         vec2 st = vUv - vec2(0.5);
+        //         // 坐标转换
+        //         st = polar(st);
+        //         float p = 0.5 * cos(num * st.y);
+
+        //         gl_FragColor.rgb = smoothstep(p, p + 0.01, st.x) * vec3(1.0);
+        //         gl_FragColor.a = 1.0;
+        //     }
+        // `
+        // 花瓣线
+        // const fragment = `
+        //     #ifdef GL_ES
+        //     precision mediump float;
+        //     #endif
+
+        //     uniform float num;
+        //     varying vec2 vUv;
+
+        //     vec2 polar(vec2 st){
+        //         // 极径跟弧度
+        //         return vec2(length(st), atan(st.y, st.x));
+        //     }
+
+        //     void main(){
+        //         vec2 st = vUv - vec2(0.5);
+        //         // 坐标转换
+        //         st = polar(st);
+        //         float p = 0.5 * abs(cos(st.y * num * 0.5));
+
+        //         gl_FragColor.rgb = smoothstep(p, p + 0.01, st.x) * vec3(1.0);
+        //         gl_FragColor.a = 1.0;
+        //     }
+        // `
+        // 其他方程图案
+        const fragment = `
+            #ifdef GL_ES
+            precision mediump float;
+            #endif
+
+            uniform float num;
+            uniform float u_scale;
+            uniform float u_offset;
+            varying vec2 vUv;
+
+            vec2 polar(vec2 st){
+                // 极径跟弧度
+                return vec2(length(st), atan(st.y, st.x));
+            }
+            
+            void main() {
+                vec2 st = vUv - vec2(0.5);
+                st = polar(st);
+                
+                // 葫芦图案
+                // float d = u_scale * 0.5 * abs(cos(st.y * num * 0.5)) - st.x + u_offset;
+                // 花苞图案
+                float d = smoothstep(-0.3, 1.0, u_scale * 0.5 * cos(st.y * num) + u_offset) - st.x; 
+
+                gl_FragColor.rgb = smoothstep(-0.01, 0.01, d) * vec3(1.0);
+                gl_FragColor.a = 1.0;
+            }
+        `
+
+        const program = renderer.compileSync(fragment,vertex)
+        renderer.useProgram(program)
+        // 3.
+        renderer.uniforms.num = 6.0
+        renderer.uniforms.u_scale = 0.2
+        renderer.uniforms.u_offset = 0.2
+        // 4.
+        renderer.setMeshData([
+            {
+                positions:[
+                    [-1,-1],
+                    [-1,1],
+                    [1,1],
+                    [1,-1],
+                ],
+                attributes:{
+                    uv:[
+                        [0,0],
+                        [0,1],
+                        [1,1],
+                        [1,0],
+                    ]
+                },
+                cells:[[0,1,2],[2,0,3]]
+            }
+        ])
+        // 5.
+        renderer.render()
+
+        // 动态变化
+        // setInterval(() => { 
+        //     renderer.uniforms.num += 1;
+        // }, 500);
+
+    </script>
+</body>
+</html>
