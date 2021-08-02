@@ -59,7 +59,7 @@
                                     vec2(12.9898,78.233)))*
                     43758.5453123);
             }
-
+            // 二维噪声，对st与方形区域的四个顶点插值
             float noise(vec2 st) {
                 vec2 i = floor(st);
                 vec2 f = fract(st);
@@ -70,9 +70,13 @@
             }
 
             void main() {
+                // 纹理坐标线性插值
                 vec2 st = mix(vec2(-10, -10), vec2(10, 10), vUv);
+                // 距离场
                 float d = distance(st, vec2(0));
+                // 距离场
                 d *= noise(uTime * 0.0005 + st);
+                // 像素颜色控制
                 d = smoothstep(0.0, 1.0, d) - step(1.0, d);
                 gl_FragColor.rgb = vec3(d);
                 gl_FragColor.a = 1.0;
