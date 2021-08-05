@@ -1,8 +1,8 @@
 import {Timing} from './timing.js';
 
-class Animator {
-    constructor({duration, interations}){
-        this.timing = {duration, interations}
+export class Animator {
+    constructor({duration, iterations}){
+        this.timing = {duration, iterations}
     }
     animate(target, update){
         let frameIndex = 0;
