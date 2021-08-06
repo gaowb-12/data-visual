@@ -1,8 +1,9 @@
 export class Timing {
-    constructor({duration, iterations = 1} = {}) {
+    constructor({duration, iterations = 1, easing = p => p } = {}) {
         this.startTime = Date.now();
         this.duration = duration;
         this.iterations = iterations;
+        this.easing = easing;
     }
 
     get time() {
@@ -11,8 +12,7 @@ export class Timing {
 
     get p() {
         const progress = Math.min(this.time / this.duration, this.iterations);
-        // return this.isFinished ? 1 : progress % 1;
-        return progress;
+        return this.isFinished ? 1 : this.easing(progress % 1);
     }
 
     get isFinished() {

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6.简单动画-贝塞尔曲线缓动</title>
+    <style>
+        .container {
+            width: 300px;
+            position: relative;
+        }
+        .block {
+            width: 100px;
+            height: 100px;
+            margin: 20px;
+            position: absolute;
+        }
+        .block:nth-child(1) {background: red;border-top:1px solid #000;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="block"></div>
+    </div>
+
+    <script type="module">
+        
+        import {Animator} from '/common/lib/animator.js';
+        const block = document.querySelector('.block');
+
+        // p = p ** 2; // 匀加速运动
+        // p = p * (2 - p); // 匀减速运动
+        // p * p * (3.0 - 2.0 * p); // smoothstep效果
+        const animator = new Animator({duration: 2000, easing: p => p * (2 - p)});
+
+        document.addEventListener('click', () => {
+            animator.animate({el: block, start: 0, end: 400}, ({target: {el, start, end}, timing: {p}}) => {
+                const left = start * (1 - p) + end * p;
+                el.style.left = `${left}px`;
+            });
+        });
+    </script>
+</body>
+</html>
