@@ -4,8 +4,10 @@ export class Animator {
     constructor({duration, iterations, easing}){
         this.timing = {duration, iterations, easing}
     }
-    updateEasing({easing}){
-        this.timing = {...this.timing, easing}
+    updateTiming({duration, iterations, easing}){
+        duration && (this.timing = {...this.timing, duration});
+        iterations && (this.timing = {...this.timing, iterations});
+        easing && (this.timing = {...this.timing, easing});
     }
     animate(target, update){
         let frameIndex = 0;

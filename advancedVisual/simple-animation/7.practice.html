@@ -28,23 +28,25 @@
         
         import {Animator} from '/common/lib/animator.js';
         const block = document.querySelector('.block');
-        const animator = new Animator({ duration: 800, easing: p => p ** 2 });
-
+        
         // p = p ** 2; // 匀加速运动
         // p = p * (2 - p); // 匀减速运动
-        let start = 0, end = 200;
+        let start = 0, end = 200, duration = 800;
         let distance = end - start;
+        const animator = new Animator({ duration, easing: p => p ** 2 });
         document.addEventListener('click', async () => {
             
             while(Math.abs(distance) >= 0.1){
-                console.log(distance)
                 // 根据方向更新动画函数
                 if(distance > 0)
                     // 向下运动，匀加速
-                    animator.updateEasing({easing: p => p ** 2});
+                    animator.updateTiming({easing: p => p ** 2});
                 else
                     // 向上运动，匀减速
-                    animator.updateEasing({easing: p => p * (2 - p)});
+                    animator.updateTiming({easing: p => p * (2 - p)});
+
+                // 更新动画的周期时间（保持加速度恒定） 
+                animator.updateTiming({duration: duration *= 0.7});
 
                 await animator.animate({el: block, start, end}, ({target: {el, start, end}, timing: {p}}) => {
                     const top = start * (1 - p) + end * p;
