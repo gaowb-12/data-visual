@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2.2 着色器实现像素动画-片元着色器实现非固定帧动画</title>
+    <title>3.着色器实现像素动画-缓动函数与非线性插值</title>
     <style>
         canvas{
             border:1px solid #aaa;
@@ -19,7 +19,9 @@
 
     <script type="module">
         import { loadImage, toPolar, fromPolar } from "/common/lib/utils.js";
+        import {Animator} from '/common/lib/animator.js';
         
+
         /**
          * gl-renderer五步法
          * 1.创建renderer对象
@@ -38,11 +40,19 @@
             attribute vec2 a_vertexPosition;
             attribute vec2 uv;
             varying vec2 vUv;
-            
+
+            uniform vec2 translation;
+
             void main(){
                 gl_PointSize = 1.0;
                 vUv = uv;
-                gl_Position = vec4(a_vertexPosition, 1.0, 1.0);
+                mat3 transformMatrix = mat3(
+                    1, 0, 0,
+                    0, 1, 0,
+                    translation, 1
+                );
+                vec3 pos = transformMatrix * vec3(a_vertexPosition, 1.0);
+                gl_Position = vec4(pos, 1.0);
             }
         `
         // 
@@ -51,27 +61,8 @@
             precision highp float;
             #endif
 
-            uniform float rotation;
-            varying vec2 vUv;
-
             void main() {
-                vec2 st = 2.0 * (vUv - vec2(0.5));
-
-                float c = cos(rotation);
-                float s = sin(rotation);
-
-                mat3 transformMatrix = mat3(
-                    c, s, 0,
-                    -s, c, 0,
-                    0, 0, 1
-                );
-
-                vec3 pos = transformMatrix * vec3(st, 1.0);
-                float d1 = 1.0 - smoothstep(0.5, 0.505, abs(pos.x)); 
-                float d2 = 1.0 - smoothstep(0.5, 0.505, abs(pos.y)); 
-
-                vec4 color = vec4(1.0, 0.0, 0.0, 1.0);
-                gl_FragColor = d1 * d2 * color;
+                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
             }
         `
         const program = renderer.compileSync(fragment, vertex);
@@ -80,14 +71,14 @@
         const textureURL = 'https://p.ssl.qhimg.com/t01f265b6b6479fffc4.png';
         const texture = await renderer.loadTexture(textureURL);
 
-        renderer.uniforms.rotation = 0.0;
+        renderer.uniforms.translation = [0.0, 0.0];
         
         renderer.setMeshData([{
             positions: [
-                [-1, -1],
-                [-1, 1],
-                [1, 1],
-                [1, -1],
+                [-0.8, -0.05],
+                [-0.8, 0.05],
+                [-0.7, 0.05],
+                [-0.7, -0.05],
             ],
             attributes: {
                 uv: [
@@ -100,10 +91,13 @@
             cells: [[0, 1, 2], [2, 0, 3]],
         }]);
         renderer.render();
-        
-        requestAnimationFrame(function update() {
-            renderer.uniforms.rotation += 0.08;
-            requestAnimationFrame(update);
+
+        // p = p ** 2; // 匀加速运动
+        // p = p * (2 - p); // 匀减速运动
+        // p * p * (3.0 - 2.0 * p); // smoothstep效果
+        const animator = new Animator({duration: 2000, easing: p => p * (2 - p)});
+        animator.animate(renderer, ({target, timing}) => {
+            target.uniforms.translation = [-0.5 * (1 - timing.p) + 0.5 * timing.p, 0];
         });
 
     </script>
