@@ -59,52 +59,59 @@
         
         // 生成圆柱体的顶点、三角剖分等信息
         
-    function cylinder(radius = 1.0, height = 1.0, segments = 30, colorCap = [0, 0, 1, 1], colorSide = [1, 0, 0, 1]) {
-        const positions = [];
-        const cells = [];
-        const color = [];
-        const cap = [[0, 0]];
-        const h = 0.5 * height;
+        function cylinder(radius = 1.0, height = 1.0, segments = 30, colorCap = [0, 0, 1, 1], colorSide = [1, 0, 0, 1]) {
+            const positions = [];
+            const cells = [];
+            const color = [];
+            const cap = [[0, 0]];
+            const h = 0.5 * height;
 
-        // 顶和底的圆
-        for(let i = 0; i <= segments; i++) {
-            const theta = Math.PI * 2 * i / segments;
-            const p = [radius * Math.cos(theta), radius * Math.sin(theta)];
-            cap.push(p);
+            /** 顶和底的圆 */
+            // 顶
+            for(let i = 0; i <= segments; i++) {
+                // 将圆分成segments份，按份比例计算弧度
+                const theta = Math.PI * 2 * i / segments;
+                // radius作为单位向量，按份计算弧度对应的坐标
+                const p = [radius * Math.cos(theta), radius * Math.sin(theta)];
+                // 将坐标加入顶点集合
+                cap.push(p);
+            }
+
+            // 转换坐标为三维坐标，加入顶点集合
+            positions.push(...cap.map(([x, y]) => [x, y, -h]));
+            for(let i = 1; i < cap.length - 1; i++) {
+                // 将顶的圆的坐标集合作三角剖分
+                cells.push([0, i, i + 1]);
+            }
+            cells.push([0, cap.length - 1, 1]);
+
+            // 底
+            let offset = positions.length;
+            positions.push(...cap.map(([x, y]) => [x, y, h]));
+            for(let i = 1; i < cap.length - 1; i++) {
+                cells.push([offset, offset + i, offset + i + 1]);
+            }
+            cells.push([offset, offset + cap.length - 1, offset + 1]);
+
+            color.push(...positions.map(() => colorCap));
+
+            // 侧面
+            offset = positions.length;
+            for(let i = 1; i < cap.length; i++) {
+                const a = [...cap[i], h];
+                const b = [...cap[i], -h];
+                const nextIdx = i < cap.length - 1 ? i + 1 : 1;
+                const c = [...cap[nextIdx], -h];
+                const d = [...cap[nextIdx], h];
+
+                positions.push(a, b, c, d);
+                color.push(colorSide, colorSide, colorSide, colorSide);
+                cells.push([offset, offset + 1, offset + 2], [offset, offset + 2, offset + 3]);
+                offset += 4;
+            }
+
+            return {positions, cells, color};
         }
-
-        positions.push(...cap.map(([x, y]) => [x, y, -h]));
-        for(let i = 1; i < cap.length - 1; i++) {
-            cells.push([0, i, i + 1]);
-        }
-        cells.push([0, cap.length - 1, 1]);
-
-        let offset = positions.length;
-        positions.push(...cap.map(([x, y]) => [x, y, h]));
-        for(let i = 1; i < cap.length - 1; i++) {
-            cells.push([offset, offset + i, offset + i + 1]);
-        }
-        cells.push([offset, offset + cap.length - 1, offset + 1]);
-
-        color.push(...positions.map(() => colorCap));
-
-        // 侧面
-        offset = positions.length;
-        for(let i = 1; i < cap.length; i++) {
-            const a = [...cap[i], h];
-            const b = [...cap[i], -h];
-            const nextIdx = i < cap.length - 1 ? i + 1 : 1;
-            const c = [...cap[nextIdx], -h];
-            const d = [...cap[nextIdx], h];
-
-            positions.push(a, b, c, d);
-            color.push(colorSide, colorSide, colorSide, colorSide);
-            cells.push([offset, offset + 1, offset + 2], [offset, offset + 2, offset + 3]);
-            offset += 4;
-        }
-
-        return {positions, cells, color};
-    }
 
         /**
          * gl-renderer五步法
@@ -153,7 +160,7 @@
         renderer.useProgram(program);
 
         
-        const geometry = cylinder();
+        const geometry = cylinder(0.5);
 
         // webgl实际坐标是左手系（右手系是使用习惯），所以需要用齐次矩阵，将左手系转换右手系，这个矩阵也叫投影矩阵
         renderer.uniforms.projectionMatrix = [
