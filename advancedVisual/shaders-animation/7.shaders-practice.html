@@ -71,11 +71,15 @@
                     return mix( mix( random( i + vec2(0.0,0.0) ), random( i + vec2(1.0,0.0) ), u.x),
                                 mix( random( i + vec2(0.0,1.0) ), random( i + vec2(1.0,1.0) ), u.x), u.y);
                 }
+                float easing(float p){
+                    return clamp(p * (2.0 - p), 0.0, 1.0);
+                }
+
                 void main() {
                     vec2 st = (vUv - 0.5) * vec2(2.0, 4.0) + 0.5;
                     vec2 uv = vUv + 1.0 - 2.0 * random(floor(st));
                     st = mix(vec2(0.0), vec2(1.0), st);
-                    vec4 color = texture2D(tMap, st );
+                    vec4 color = texture2D(tMap, mix(st, uv, easing(uTime)) );
                     gl_FragColor = color;
                 }
             `
@@ -108,7 +112,7 @@
             renderer.render();
     
             function update(uTime){
-                renderer.uniforms.uTime = uTime
+                renderer.uniforms.uTime = uTime/2000
                 requestAnimationFrame(update)
             }
     
