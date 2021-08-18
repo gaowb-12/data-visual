@@ -21,6 +21,7 @@
         import { loadImage, toPolar, fromPolar } from "/common/lib/utils.js";
         import { Animator } from '/common/lib/animator.js';
         import { cross, normalize } from '/common/lib/math/functions/Vec3Func.js';
+        import { normalFromMat4 } from '/common/lib/math/functions/Mat3Func.js';
         import { multiply, subtract } from '/common/lib/math/functions/Mat4Func.js';
 
         // 用立方体沿 x、y、z 轴的旋转来生成模型矩阵
@@ -59,12 +60,11 @@
         }
         
         // 生成圆柱体的顶点、三角剖分等信息
-        
         function cylinder(radius = 1.0, height = 1.0, segments = 30, colorCap = [0, 0, 1, 1], colorSide = [1, 0, 0, 1]) {
-            const positions = [];
-            const cells = [];
-            const color = [];
-            const normal = [];
+            const positions = []; // 物体的所有顶点集合
+            const cells = []; // 将物体进行三角剖分的索引集合
+            const color = []; // 物体的顶点颜色
+            const normal = []; // 每个顶点的法向量集合
             const cap = [[0, 0]];
             const h = 0.5 * height;
 
@@ -81,6 +81,7 @@
 
             // 转换坐标为三维坐标，加入顶点集合
             positions.push(...cap.map(([x, y]) => [x, y, -h]));
+            normal.push(...cap.map(() => [0, 0, -1]));
             for(let i = 1; i < cap.length - 1; i++) {
                 // 将顶的圆的坐标集合作三角剖分
                 cells.push([0, i, i + 1]);
@@ -90,6 +91,7 @@
             // 底
             let offset = positions.length;
             positions.push(...cap.map(([x, y]) => [x, y, h]));
+            normal.push(...cap.map(() => [0, 0, 1]));
             for(let i = 1; i < cap.length - 1; i++) {
                 cells.push([offset, offset + i, offset + i + 1]);
             }
@@ -117,15 +119,16 @@
                 cross(norm, subtract(tmp1, b, a), subtract(tmp2, c, a));
                 // 归一化
                 normalize(norm, norm);
-                // 曲面四个顶点的法向量相同
+                // 曲面四个顶点的法向量相同（三维向量）
                 normal.push(norm, norm, norm, norm);
+
                 // 每个顶点对应的颜色信息
                 color.push(colorSide, colorSide, colorSide, colorSide);
                 cells.push([offset, offset + 1, offset + 2], [offset, offset + 2, offset + 3]);
                 offset += 4;
             }
 
-            return {positions, cells, color};
+            return { positions, cells, color, normal };
         }
 
         /**
@@ -150,6 +153,7 @@
 
             varying vec4 vColor;
             varying float vCos;
+
             // 投影矩阵
             uniform mat4 projectionMatrix;
             // 模型矩阵
@@ -157,13 +161,20 @@
             // 法向量矩阵 3X3
             uniform mat3 normalMatrix;
 
-            // 电光源的坐标位置
+            // 点光源的坐标位置
             const vec3 lightPosition = vec3(1, 0, 0);
 
             void main(){
                 gl_PointSize = 1.0;
                 vColor = color;
-                gl_Position = projectionMatrix * modelMatrix * vec4(a_vertexPosition, 1.0);
+                vec4 pos = modelMatrix * vec4(a_vertexPosition, 1.0);
+                // 点光源与顶点作差，形成光照向量
+                vec3 invLight = lightPosition - pos.xyz;
+                // 对物体的法向量做变换（通过法向量矩阵）
+                vec3 norm = normalize(normalMatrix * normal);
+                // 归一化的光照向量与归一化的法线向量做点乘，得到的就是这两个向量夹角的余弦，便于计算光照强度;对于角度大于90°的光照强度取0。
+                vCos = max(dot(normalize(invLight), norm), 0.0);
+                gl_Position = projectionMatrix * pos;
             }
         `
         // 
@@ -173,17 +184,20 @@
             #endif
 
             varying vec4 vColor;
+            varying float vCos;
+
+            uniform vec4 lightColor;
 
             void main() {
-                vec4 color = vColor;
-                gl_FragColor = color;
+                gl_FragColor.rgb = vColor.rgb + vCos * lightColor.a * lightColor.rgb;
+                gl_FragColor.a = vColor.a;
             }
         `
         const program = renderer.compileSync(fragment, vertex);
         renderer.useProgram(program);
 
         
-        const geometry = cylinder(0.5);
+        const geometry = cylinder(0.5, 1.0, 30, [0, 0, 1, 1], [0.5, 0.5, 0.5, 1]);
 
         // webgl实际坐标是左手系（右手系是使用习惯），所以需要用齐次矩阵，将左手系转换右手系，这个矩阵也叫投影矩阵
         renderer.uniforms.projectionMatrix = [
@@ -194,6 +208,8 @@
         ]
         // 模型矩阵，作用于要变换的物体
         renderer.uniforms.modelMatrix = fromRotation(0, 0, 0);
+        // 光照
+        renderer.uniforms.lightColor = [1.0, 0.0, 0.0, 0.8];
         
         
         // 顶点信息
@@ -201,6 +217,7 @@
             positions: geometry.positions,
             attributes: {
                 color: geometry.color,
+                normal: geometry.normal,
             },
             cells: geometry.cells,
         }]);
@@ -214,7 +231,11 @@
             rotateX += 0.003;
             rotateY += 0.005;
             rotateZ += 0.007;
-            renderer.uniforms.modelMatrix = fromRotation(rotateX, rotateY, rotateZ);
+            // 模型矩阵
+            const modelMatrix = fromRotation(rotateX, rotateY, rotateZ);
+            renderer.uniforms.modelMatrix = modelMatrix;
+            // 法向量矩阵
+            renderer.uniforms.normalMatrix = normalFromMat4([], modelMatrix);
             requestAnimationFrame(update)
         }
         update()
