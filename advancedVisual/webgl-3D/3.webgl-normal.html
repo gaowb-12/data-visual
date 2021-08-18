@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2.用webgl绘制3D物体-绘制圆柱体</title>
+    <title>3.用webgl绘制3D物体-构造和使用法向量</title>
     <style>
         canvas{
             border:1px solid #aaa;
@@ -20,7 +20,8 @@
     <script type="module">
         import { loadImage, toPolar, fromPolar } from "/common/lib/utils.js";
         import { Animator } from '/common/lib/animator.js';
-        import { multiply } from '/common/lib/math/functions/Mat4Func.js';
+        import { cross, normalize } from '/common/lib/math/functions/Vec3Func.js';
+        import { multiply, subtract } from '/common/lib/math/functions/Mat4Func.js';
 
         // 用立方体沿 x、y、z 轴的旋转来生成模型矩阵
         function fromRotation(rotationX, rotationY, rotationZ) {
@@ -63,6 +64,7 @@
             const positions = [];
             const cells = [];
             const color = [];
+            const normal = [];
             const cap = [[0, 0]];
             const h = 0.5 * height;
 
@@ -97,6 +99,7 @@
 
             // 侧面
             offset = positions.length;
+            const tmp1 = [], tmp2 = [];
             for(let i = 1; i < cap.length; i++) {
                 // 取顶和底面的相邻的四个顶点坐标，组成侧面的坐标
                 const a = [...cap[i], h];
@@ -108,6 +111,14 @@
 
                 // 将侧面顶点加入顶点坐标集合
                 positions.push(a, b, c, d);
+
+                const norm = [];
+                // 计算出法向量
+                cross(norm, subtract(tmp1, b, a), subtract(tmp2, c, a));
+                // 归一化
+                normalize(norm, norm);
+                // 曲面四个顶点的法向量相同
+                normal.push(norm, norm, norm, norm);
                 // 每个顶点对应的颜色信息
                 color.push(colorSide, colorSide, colorSide, colorSide);
                 cells.push([offset, offset + 1, offset + 2], [offset, offset + 2, offset + 3]);
@@ -134,12 +145,20 @@
         const vertex = `
             attribute vec3 a_vertexPosition;
             attribute vec4 color;
+            // 法向量
+            attribute vec3 normal;
 
             varying vec4 vColor;
+            varying float vCos;
             // 投影矩阵
             uniform mat4 projectionMatrix;
             // 模型矩阵
             uniform mat4 modelMatrix;
+            // 法向量矩阵 3X3
+            uniform mat3 normalMatrix;
+
+            // 电光源的坐标位置
+            const vec3 lightPosition = vec3(1, 0, 0);
 
             void main(){
                 gl_PointSize = 1.0;
