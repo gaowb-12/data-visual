@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.添加相机用透视原理进行投影-剪裁空间和投影对3D图像的影响</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="554" height="554"></canvas>
+    <script src="/common/lib/gl-renderer.js"></script>
+
+    <script type="module">
+        import { loadImage, toPolar, fromPolar } from "/common/lib/utils.js";
+        import { Animator } from '/common/lib/animator.js';
+        import { cross, normalize } from '/common/lib/math/functions/Vec3Func.js';
+        import { normalFromMat4 } from '/common/lib/math/functions/Mat3Func.js';
+        import { multiply, subtract } from '/common/lib/math/functions/Mat4Func.js';
+        import { Mat4 } from '/common/lib/math/Mat4.js';
+
+        // 用立方体沿 x、y、z 轴的旋转来生成模型矩阵
+        function fromRotation(rotationX, rotationY, rotationZ) {
+            let c = Math.cos(rotationX);
+            let s = Math.sin(rotationX);
+            const rx = [
+                1, 0, 0, 0,
+                0, c, s, 0,
+                0, -s, c, 0,
+                0, 0, 0, 1,
+            ];
+
+            c = Math.cos(rotationY);
+            s = Math.sin(rotationY);
+            const ry = [
+                c, 0, s, 0,
+                0, 1, 0, 0,
+                -s, 0, c, 0,
+                0, 0, 0, 1,
+            ];
+
+            c = Math.cos(rotationZ);
+            s = Math.sin(rotationZ);
+            const rz = [
+                c, s, 0, 0,
+                -s, c, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1,
+            ];
+
+            const ret = [];
+            multiply(ret, rx, ry);
+            multiply(ret, ret, rz);
+            return ret;
+        }
+        
+        // 生成圆柱体的顶点、三角剖分等信息
+        function cylinder(radius = 1.0, height = 1.0, segments = 30, colorCap = [0, 0, 1, 1], colorSide = [1, 0, 0, 1]) {
+            const positions = []; // 物体的所有顶点集合
+            const cells = []; // 将物体进行三角剖分的索引集合
+            const color = []; // 物体的顶点颜色
+            const normal = []; // 每个顶点的法向量集合
+            const cap = [[0, 0]];
+            const h = 0.5 * height;
+
+            /** 顶和底的圆 */
+            // 顶
+            for(let i = 0; i <= segments; i++) {
+                // 将圆分成segments份，按份比例计算弧度
+                const theta = Math.PI * 2 * i / segments;
+                // radius作为单位向量，按份计算弧度对应的坐标
+                const p = [radius * Math.cos(theta), radius * Math.sin(theta)];
+                // 将坐标加入顶点集合
+                cap.push(p);
+            }
+
+            // 转换坐标为三维坐标，加入顶点集合
+            positions.push(...cap.map(([x, y]) => [x, y, -h]));
+            normal.push(...cap.map(() => [0, 0, -1]));
+            for(let i = 1; i < cap.length - 1; i++) {
+                // 将顶的圆的坐标集合作三角剖分
+                cells.push([0, i, i + 1]);
+            }
+            cells.push([0, cap.length - 1, 1]);
+
+            // 底
+            let offset = positions.length;
+            positions.push(...cap.map(([x, y]) => [x, y, h]));
+            normal.push(...cap.map(() => [0, 0, 1]));
+            for(let i = 1; i < cap.length - 1; i++) {
+                cells.push([offset, offset + i, offset + i + 1]);
+            }
+            cells.push([offset, offset + cap.length - 1, offset + 1]);
+
+            color.push(...positions.map(() => colorCap));
+
+            // 侧面
+            offset = positions.length;
+            const tmp1 = [], tmp2 = [];
+            for(let i = 1; i < cap.length; i++) {
+                // 取顶和底面的相邻的四个顶点坐标，组成侧面的坐标
+                const a = [...cap[i], h];
+                const b = [...cap[i], -h];
+                // 判断是否是最后一个顶点，最后一个顶点特殊处理
+                const nextIdx = i < cap.length - 1 ? i + 1 : 1;
+                const c = [...cap[nextIdx], -h];
+                const d = [...cap[nextIdx], h];
+
+                // 将侧面顶点加入顶点坐标集合
+                positions.push(a, b, c, d);
+
+                const norm = [];
+                // 计算出法向量
+                cross(norm, subtract(tmp1, b, a), subtract(tmp2, c, a));
+                // 归一化
+                normalize(norm, norm);
+                // 曲面四个顶点的法向量相同（三维向量）
+                normal.push(norm, norm, norm, norm);
+
+                // 每个顶点对应的颜色信息
+                color.push(colorSide, colorSide, colorSide, colorSide);
+                cells.push([offset, offset + 1, offset + 2], [offset, offset + 2, offset + 3]);
+                offset += 4;
+            }
+
+            return { positions, cells, color, normal };
+        }
+
+        // 求视图矩阵
+        function updateCamera(eye, target = [0, 0, 0]){
+            const [x, y, z] = eye;
+            // 初始的相机模型矩阵
+            const m = new Mat4(
+                1, 0, 0, 0, 
+                0, 1, 0, 0, 
+                0, 0, 1, 0, 
+                x, y, z, 1
+            );
+            // 向上方向
+            const up = [0, 1, 0];
+            m.lookAt(eye, target, up).inverse();
+            renderer.uniforms.viewMatrix = m;
+        }
+
+        /**
+         * gl-renderer五步法
+         * 1.创建renderer对象
+         * 2.创建并启用webgl程序
+         * 3.设置uniform变量
+         * 4.将定点数据送入缓冲区
+         * 5.渲染
+         * 
+        */
+        // 1.
+        let canvas = document.querySelector("canvas");
+        const renderer = new GlRenderer(canvas, {  depth: true });
+
+        // 2.
+        const vertex = `
+            attribute vec3 a_vertexPosition;
+            attribute vec4 color;
+            // 法向量
+            attribute vec3 normal;
+
+            varying vec4 vColor;
+            varying float vCos;
+
+            // 投影矩阵
+            uniform mat4 projectionMatrix;
+            // 模型矩阵
+            uniform mat4 modelMatrix;
+            // 视图矩阵
+            uniform mat4 viewMatrix;
+            // 法向量矩阵 3X3
+            uniform mat3 normalMatrix;
+
+            // 点光源的坐标位置
+            const vec3 lightPosition = vec3(1, 0, 0);
+
+            void main(){
+                gl_PointSize = 1.0;
+                vColor = color;
+                // 对物体应用视图矩阵（相对于相机坐标）
+                vec4 pos = viewMatrix * modelMatrix * vec4(a_vertexPosition, 1.0);
+                vec4 lp = viewMatrix * vec4(lightPosition, 1.0);
+                // 点光源与顶点作差，形成光照向量
+                vec3 invLight = lp.xyz - pos.xyz;
+                // 对物体的法向量做变换（通过法向量矩阵）
+                vec3 norm = normalize(normalMatrix * normal);
+                // 归一化的光照向量与归一化的法线向量做点乘，得到的就是这两个向量夹角的余弦，便于计算光照强度;对于角度大于90°的光照强度取0。
+                vCos = max(dot(normalize(invLight), norm), 0.0);
+                gl_Position = projectionMatrix * pos;
+            }
+        `
+        // 
+        const fragment = `
+        #ifdef GL_ES
+            precision highp float;
+            #endif
+
+            varying vec4 vColor;
+            varying float vCos;
+
+            uniform vec4 lightColor;
+
+            void main() {
+                gl_FragColor.rgb = vColor.rgb + vCos * lightColor.a * lightColor.rgb;
+                gl_FragColor.a = vColor.a;
+            }
+        `
+        const program = renderer.compileSync(fragment, vertex);
+        renderer.useProgram(program);
+
+        
+        const geometry = cylinder(0.5, 1.0, 30, [0, 0, 1, 1], [0.5, 0.5, 0.5, 1]);
+
+        // webgl实际坐标是左手系（右手系是使用习惯），所以需要用齐次矩阵，将左手系转换右手系，这个矩阵也叫投影矩阵
+        renderer.uniforms.projectionMatrix = [
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, -1, 0,
+            0, 0, 0, 1
+        ]
+        // 模型矩阵，作用于要变换的物体
+        renderer.uniforms.modelMatrix = fromRotation(0, 0, 0);
+        // 光照
+        renderer.uniforms.lightColor = [1.0, 0.0, 0.0, 0.8];
+        // 改变相机位置，计算视图矩阵
+        updateCamera([0, 0, 0]);
+        
+        // 顶点信息
+        renderer.setMeshData([{
+            positions: geometry.positions,
+            attributes: {
+                color: geometry.color,
+                normal: geometry.normal,
+            },
+            cells: geometry.cells,
+        }]);
+        renderer.render();
+
+        // 旋转的立方体
+        let rotateX = 0, rotateY = 0, rotateZ = 0;
+
+        function update(){
+            rotateX += 0.003;
+            rotateY += 0.005;
+            rotateZ += 0.007;
+            // 模型矩阵
+            const modelMatrix = fromRotation(rotateX, rotateY, rotateZ);
+            modelMatrix[12] = 0.5; // 给 x 轴增加 0.5 的平移 
+            modelMatrix[13] = 0.5; // 给 y 轴增加 0.5 的平移
+            modelMatrix[14] = 0.5; // 给 z 轴增加 0.5 的平移
+            renderer.uniforms.modelMatrix = modelMatrix;
+            // 法向量矩阵
+            renderer.uniforms.normalMatrix = normalFromMat4([], modelMatrix);
+            requestAnimationFrame(update);
+        }
+        update()
+    </script>
+</body>
+</html>
