@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1.通过仿射变换移动和旋转3D物体-旋转几何体</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="554" height="554"></canvas>
+
+    <script type="module">
+        import { Renderer, Camera, Transform, Program, Mesh, Texture, Geometry } from '/common/lib/ogl/index.mjs';
+
+        // 加载纹理
+        function loadTexture(src) {
+            const texture = new Texture(gl);
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    texture.image = img;
+                    resolve(texture);
+                };
+                img.src = src;
+            });
+        }
+
+        // 加载数据模型方法
+        async function loadModel(src) {
+            const data = await (await fetch(src)).json();
+            const geometry = new Geometry(gl, {
+                position: {
+                    size: 3, 
+                    data: new Float32Array(data.position)
+                },
+                uv: {
+                    size: 2, 
+                    data: new Float32Array(data.uv)
+                },
+                normal: {
+                    size: 3, 
+                    data: new Float32Array(data.normal)
+                },
+            });
+            return geometry;
+        }
+
+        let canvas = document.querySelector("canvas");
+
+        // 1. 创建画布宽高512的renderer对象
+        const renderer = new Renderer({
+            canvas,
+            width:512,
+            height:512,
+        });
+
+        const gl = renderer.gl;
+        gl.clearColor(1, 1, 1, 1);
+        // 2. 创建相机（默认透视投影）
+        // 视角35°
+        const camera = new Camera(gl, { fov:35 });
+        // 相机的位置
+        camera.position.set(0, 1, 7);
+        // 相机的朝向
+        camera.lookAt([0, 0, 0]);
+
+        // 3. 创建场景
+        const scene = new Transform();
+
+        // 4. 创建几何体对象
+        const geometry = await loadModel('./assets/airplane.json');
+        
+        // 5. 创建webgl程序
+        const vertex = /* glsl */ `
+        precision highp float;
+        
+        attribute vec3 position;
+        attribute vec3 normal;
+        
+        uniform mat4 modelViewMatrix;
+        uniform mat4 projectionMatrix;
+        uniform mat3 normalMatrix;
+        
+        varying vec3 vNormal;
+        
+        void main() {
+            vNormal = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+        `;
+        
+        const fragment = /* glsl */ `
+        precision highp float;
+        
+        uniform sampler2D tMap;
+        varying vec2 vUv;
+        
+        void main() {
+            gl_FragColor = texture2D(tMap, vUv);
+        }
+        `;
+        
+        // 加载图片纹理
+        const texture = await loadTexture('./assets/airplane.jpg');
+        
+        const program = new Program(gl, {
+            vertex,
+            fragment,
+            uniforms: {
+                tMap: {value: texture},
+            },
+        });
+        // 6. 创建网格对象
+        const mesh = new Mesh(gl, {geometry, program});
+        mesh.setParent(scene);
+        
+        // 7. 渲染
+        renderer.render({scene, camera});
+
+    </script>
+</body>
+</html>
