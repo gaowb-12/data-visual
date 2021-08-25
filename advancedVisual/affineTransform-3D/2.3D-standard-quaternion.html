@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2.通过仿射变换移动和旋转3D物体-旋转几何体（四元数）</title>
+</head>
+<body>
+  <canvas width="512" height="512"></canvas>
+  <script type="module">
+    import {Renderer, Camera, Transform, Program, Geometry, Mesh, Orbit, Texture, Polyline, Color, Vec3, Quat} from '/common/lib/ogl/index.mjs';
+    import * as dat from '/common/lib/dat.gui.js';
+
+    const canvas = document.querySelector('canvas');
+    const renderer = new Renderer({
+      canvas,
+      width: 512,
+      height: 512,
+    });
+
+    const gl = renderer.gl;
+    gl.clearColor(1, 1, 1, 1);
+    const camera = new Camera(gl, {fov: 35});
+    camera.position.set(0, 0, 10);
+    camera.lookAt([0, 0, 0]);
+
+    const scene = new Transform();
+
+    const vertex = /* glsl */ `
+      precision highp float;
+
+      attribute vec3 position;
+      attribute vec3 normal;
+      attribute vec2 uv;
+
+      uniform mat4 modelViewMatrix;
+      uniform mat4 projectionMatrix;
+
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+
+    const fragment = /* glsl */ `
+      precision highp float;
+
+      uniform sampler2D tMap;
+      varying vec2 vUv;
+
+      void main() {
+        gl_FragColor = texture2D(tMap, vUv);
+      }
+    `;
+
+    async function loadModel(src) {
+      const data = await (await fetch(src)).json();
+
+      const geometry = new Geometry(gl, {
+        position: {size: 3, data: new Float32Array(data.position)},
+        uv: {size: 2, data: new Float32Array(data.uv)},
+        normal: {size: 3, data: new Float32Array(data.normal)},
+      });
+
+      return geometry;
+    }
+
+    function loadTexture(src) {
+      const texture = new Texture(gl);
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          texture.image = img;
+          resolve(texture);
+        };
+        img.src = src;
+      });
+    }
+
+    const controls = new Orbit(camera);
+
+    (async function () {
+      const geometry = await loadModel('./assets/airplane.json');
+      const texture = await loadTexture('./assets/airplane.jpg');
+
+      const program = new Program(gl, {
+        vertex,
+        fragment,
+        uniforms: {
+          tMap: { value: texture },
+        },
+      });
+      // 渲染飞机
+      const mesh = new Mesh(gl, {geometry, program});
+      mesh.setParent(scene);
+
+      // 轴向量的起始坐标与终止坐标
+      const points = [
+        new Vec3(0, 0, 0),
+        new Vec3(0, 10, 0),
+      ];
+
+      // 生成轴（Polyline生成线段）
+      const axis = new Polyline(gl, {
+        points,
+        uniforms: {
+          uColor: { value: new Color('#f00') },
+          uThickness: { value: 3 },
+        },
+      });
+      // 渲染
+      axis.mesh.setParent(scene);
+      renderer.render({scene, camera});
+
+      const gui = new dat.GUI();
+      // 调色板
+      const palette = {
+        alpha: 0,
+        x: 0,
+        y: 1,
+        z: 0,
+      };
+
+      // 更新轴
+      function updateAxis() {
+        const {x, y, z} = palette;
+        // 根据调色板生成向量
+        const v = new Vec3(x, y, z).normalize().scale(10);
+        // 更新周向量
+        points[1].copy(v);
+        // 更新轴
+        axis.updateGeometry();
+        // 渲染
+        renderer.render({scene, camera});
+      }
+      // 更新四元数
+      function updateQuaternion(val) {
+        // 计算绕轴旋转的角度
+        const theta = 0.5 * val / 180 * Math.PI;
+        const c = Math.cos(theta);
+        const s = Math.sin(theta);
+        // 将周向量归一化处理
+        const p = new Vec3().copy(points[1]).normalize();
+        // 计算新的四元数
+        const q = new Quat(p.x * s, p.y * s, p.z * s, c);
+        // 直接赋值给网格对象
+        mesh.quaternion = q;
+        renderer.render({scene, camera});
+      }
+      gui.add(palette, 'x', -10, 10).onChange(updateAxis);
+      gui.add(palette, 'y', -10, 10).onChange(updateAxis);
+      gui.add(palette, 'z', -10, 10).onChange(updateAxis);
+      gui.add(palette, 'alpha', -180, 180).onChange(updateQuaternion);
+
+      requestAnimationFrame(update);
+      function update() {
+        requestAnimationFrame(update);
+        // controls.update();
+        renderer.render({scene, camera});
+      }
+    }());
+  </script>
+</body>
+</html>
