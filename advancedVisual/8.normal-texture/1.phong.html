@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2.模拟光照让3D场景更逼真-Phong反射模型</title>
+    <title>1.法线贴图模拟真实物体表面-使用法线贴图给几何体表面增加凹凸效果</title>
     <style>
         canvas{
             border:1px solid #aaa;
@@ -17,31 +17,9 @@
     <canvas width="512" height="512"></canvas>
 
     <script type="module">
-        import { Renderer, Camera, Transform, Program, Color, Mesh, Texture, Orbit, Sphere, Box, Cylinder, Torus } from '/common/lib/ogl/index.mjs';
+        import { Renderer, Camera, Transform, Program, Color, Mesh, Texture, Orbit, Box, } from '/common/lib/ogl/index.mjs';
         import * as dat from '/common/lib/dat.gui.js';
         import { Phong, Material } from "/common/lib/phong.js"
-        
-        const phong = new Phong();
-        // 添加一个平行光
-        phong.addLight({
-            direction: [-1, 0, 0],
-        });
-        // 添加两个点光源
-        phong.addLight({
-            position: [-3, 3, 0],
-            color: [1, 0, 0],
-        });
-
-        phong.addLight({
-            position: [3, 3, 0],
-            color: [0, 0, 1],
-        });
-
-        // 分别对应4个几何体的材质
-        const matrial1 = new Material(new Color('#0000ff'), 2.0);
-        const matrial2 = new Material(new Color('#ff00ff'), 2.0);
-        const matrial3 = new Material(new Color('#008000'), 2.0);
-        const matrial4 = new Material(new Color('#ff0000'), 2.0);
 
         let canvas = document.querySelector("canvas");
         // 1. 创建画布宽高512的renderer对象
@@ -59,7 +37,7 @@
             // 视角35°
             const camera = new Camera(gl, { fov: 35 });
             // 相机的位置
-            camera.position.set(0, 0, 7);
+            camera.position.set(0, 1, 7);
             // 相机的朝向
             camera.lookAt([0, 0, 0]);
 
@@ -67,10 +45,6 @@
             const scene = new Transform();
 
             // 4. 创建几何体对象
-            const sphereGeometry = new Sphere(gl);
-            const cubeGeometry = new Box(gl);
-            const cylinderGeometry = new Cylinder(gl);
-            const torusGeometry = new Torus(gl);
                     
             // 5. 创建webgl程序
             const vertex = /* glsl */ `
@@ -223,64 +197,33 @@
                 }
             `;
 
+            const phong = new Phong();
+            phong.addLight({  direction: [0, -3, -3],});
+            phong.addLight({  direction: [0, 3, 3],});
+            const matrial = new Material(new Color('#808080'));
+
             // 传入光的相关属性
             const directional = {
-                vCameraPos:{ value: [0, 0, 7] },  
+                vCameraPos:{ value: [0, 1, 7] },  
                 ...phong.uniforms,
             };
 
-            const program1 = new Program(gl, {
+            const program = new Program(gl, {
                 vertex,
                 fragment,
                 uniforms: {
                     ...directional,
-                    ...matrial1.uniforms,    
-                },
-            });
-
-            const program2 = new Program(gl, {
-                vertex,
-                fragment,
-                uniforms: {
-                    ...directional,
-                    ...matrial2.uniforms,    
-                },
-            });
-            const program3 = new Program(gl, {
-                vertex,
-                fragment,
-                uniforms: {
-                    ...directional,
-                    ...matrial3.uniforms,    
-                },
-            });
-            const program4 = new Program(gl, {
-                vertex,
-                fragment,
-                uniforms: {
-                    ...directional,
-                    ...matrial4.uniforms,    
+                    ...matrial.uniforms,    
                 },
             });
             
             // 6. 创建网格对象
             const controls = new Orbit(camera);
             
-            const torus = new Mesh(gl, {geometry: torusGeometry, program: program1});
-            torus.position.set(0, 1.3, 0);
-            torus.setParent(scene);
-
-            const sphere = new Mesh(gl, {geometry: sphereGeometry, program: program2});
-            sphere.position.set(1.3, 0, 0);
-            sphere.setParent(scene);
-
-            const cube = new Mesh(gl, {geometry: cubeGeometry, program: program3});
-            cube.position.set(0, -1.3, 0);
+            const geometry = new Box(gl);
+            const cube = new Mesh(gl, {geometry, program});
             cube.setParent(scene);
-
-            const cylinder = new Mesh(gl, {geometry: cylinderGeometry, program: program4});
-            cylinder.position.set(-1.3, 0, 0);
-            cylinder.setParent(scene);
+            cube.rotation.x = -Math.PI / 2;
             
             // 7. 渲染
             requestAnimationFrame(update);
@@ -289,7 +232,6 @@
                 controls.update();
                 renderer.render({scene, camera});
             }
-
         })()
     </script>
 </body>
