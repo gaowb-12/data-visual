@@ -19,7 +19,20 @@
     <script type="module">
         import { Renderer, Camera, Transform, Program, Color, Mesh, Texture, Orbit, Box, } from '/common/lib/ogl/index.mjs';
         import * as dat from '/common/lib/dat.gui.js';
-        import { Phong, Material } from "/common/lib/phong.js"
+        import { Phong, Material, createTB } from "/common/lib/phong.js"
+
+        // 加载纹理
+        function loadTexture(src) {
+            const texture = new Texture(gl);
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    texture.image = img;
+                    resolve(texture);
+                };
+                img.src = src;
+            });
+        }
 
         let canvas = document.querySelector("canvas");
         // 1. 创建画布宽高512的renderer对象
@@ -45,36 +58,58 @@
             const scene = new Transform();
 
             // 4. 创建几何体对象
-                    
+            const geometry = new Box(gl);
+
             // 5. 创建webgl程序
-            const vertex = /* glsl */ `
+            const vertex = `#version 300 es
                 precision highp float;
-                
-                attribute vec3 position;
-                attribute vec3 normal;
-                
+
+                in vec3 position;
+                in vec3 normal;
+                in vec2 uv;
+                in vec3 tang;
+                in vec3 bitang;
+
+                uniform mat4 modelMatrix;
                 uniform mat4 modelViewMatrix;
+                uniform mat4 viewMatrix;
                 uniform mat4 projectionMatrix;
                 uniform mat3 normalMatrix;
-                
-                varying vec3 vNormal;
-                varying vec4 vPos;
-                
+                uniform vec3 cameraPosition;
+
+                out vec3 vNormal;
+                out vec4 vPos;
+                out vec2 vUv;
+                out vec3 vCameraPos;
+                // TBN 矩阵
+                out mat3 vTBN;
+
                 void main() {
-                    vPos = modelViewMatrix * vec4(position, 1.0);
-                    // 计算法向量
+                    // 对几何体进行模型+视图变换，转换到相机坐标系
+                    vec4 pos = modelViewMatrix * vec4(position, 1.0);
+                    vPos = pos;
+                    vUv = uv;
+                    // 对相机位置做视图变换，转换到相机坐标系
+                    vCameraPos = (viewMatrix * vec4(cameraPosition, 1.0)).xyz;
+
+                    // 切线空间要经过法向量矩阵的转换，转换为相对于世界坐标系
                     vNormal = normalize(normalMatrix * normal);
-                    gl_Position = projectionMatrix * vPos;
+                    vec3 N = vNormal;
+                    vec3 T = normalize(normalMatrix * tang);
+                    vec3 B = normalize(normalMatrix * bitang);
+
+                    // TBN矩阵传给片元着色器
+                    vTBN = mat3(T, B, N);
+                    
+                    gl_Position = projectionMatrix * pos;
                 }
+
             `;
             
-            const fragment = /* glsl */ `
-                #ifdef GL_ES
-                precision mediump float;
-                #endif
-                #define MAX_LIGHT_COUNT 16
+            const fragment = /* glsl */ `#version 300 es
+                precision highp float;
 
-                uniform vec3 vCameraPos;
+                #define MAX_LIGHT_COUNT 16
                 uniform mat4 viewMatrix;
 
                 // 声明 vec3 和 float 数组，数组的大小为 16。这样，对于每一种光源，我们都可以支持 16 个。
@@ -95,8 +130,15 @@
                 uniform float shininess;
                 uniform float specularFactor;
 
-                varying vec3 vNormal;
-                varying vec4 vPos;
+                uniform sampler2D tNormal;
+
+                in vec3 vCameraPos;
+                in vec3 vNormal;
+                in vec2 vUv;
+                in vec4 vPos;
+                in mat3 vTBN;
+
+                out vec4 FragColor;
 
                 // 镜面反射强度
                 float getSpecular(vec3 dir, vec3 normal, vec3 eye){
@@ -186,14 +228,21 @@
                     return vec4(diffuse, specular);
                 }
 
+                // 将法线贴图中的法向量 转换为 当前切线空间（相对于世界坐标系）中的实际法向量
+                vec3 getNormal() {  
+                    vec3 n = texture(tNormal, vUv).rgb * 2.0 - 1.0;  
+                    return normalize(vTBN * n);
+                }
+
                 void main() {
                     // 根据相机位置计算对每个点的视线的向量方向
                     vec3 eyeDirection = normalize(vCameraPos - vPos.xyz);  
-                    vec4 phong = phongReflection(vPos.xyz, vNormal, eyeDirection);
+                    vec3 normal = getNormal();
+                    vec4 phong = phongReflection(vPos.xyz, normal, eyeDirection);
 
                     // 合成颜色
-                    gl_FragColor.rgb = phong.w + (phong.xyz + ambientLight) * materialReflection;;
-                    gl_FragColor.a = 1.0;
+                    FragColor.rgb = phong.w + (phong.xyz + ambientLight) * materialReflection;;
+                    FragColor.a = 1.0;
                 }
             `;
 
@@ -202,10 +251,13 @@
             phong.addLight({  direction: [0, 3, 3],});
             const matrial = new Material(new Color('#808080'));
 
+            const normalMap = await loadTexture('./assets/normal_map.png');
+
             // 传入光的相关属性
             const directional = {
                 vCameraPos:{ value: [0, 1, 7] },  
                 ...phong.uniforms,
+                tNormal:{ value: normalMap }
             };
 
             const program = new Program(gl, {
@@ -213,15 +265,14 @@
                 fragment,
                 uniforms: {
                     ...directional,
-                    ...matrial.uniforms,    
+                    ...matrial.uniforms,
                 },
             });
             
             // 6. 创建网格对象
             const controls = new Orbit(camera);
             
-            const geometry = new Box(gl);
-            const cube = new Mesh(gl, {geometry, program});
+            const cube = new Mesh(gl, { geometry:createTB(geometry), program });
             cube.setParent(scene);
             cube.rotation.x = -Math.PI / 2;
             

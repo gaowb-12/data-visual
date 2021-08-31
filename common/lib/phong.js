@@ -1,3 +1,5 @@
+import { Vec3, Vec2 } from '/common/lib/ogl/index.mjs';
+
 // 反射模型
 export class Phong{
     constructor(ambientLight = [0.5, 0.5, 0.5]){
@@ -107,4 +109,70 @@ export class Material{
                     shininess: { value: this.shininess }, 
                 };
     }
+}
+
+/**
+ * 切线空间中的切线和副切线计算
+ * @param {Geometry} geometry 空间几何体实例对象
+ * */ 
+export function createTB(geometry) {
+    const {position, index, uv} = geometry.attributes;
+    if(!uv) throw new Error('NO uv.');
+    function getTBNTriangle(p1, p2, p3, uv1, uv2, uv3) {
+        const edge1 = new Vec3().sub(p2, p1);
+        const edge2 = new Vec3().sub(p3, p1);
+        const deltaUV1 = new Vec2().sub(uv2, uv1);
+        const deltaUV2 = new Vec2().sub(uv3, uv1);
+
+        const tang = new Vec3();
+        const bitang = new Vec3();
+
+        const f = 1.0 / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        tang.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tang.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tang.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        tang.normalize();
+
+        bitang.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        bitang.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        bitang.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+
+        bitang.normalize();
+
+        return {tang, bitang};
+    }
+
+    const size = position.size;
+    if(size < 3) throw new Error('Error dimension.');
+
+    const len = position.data.length / size;
+    const tang = new Float32Array(len * 3);
+    const bitang = new Float32Array(len * 3);
+
+    for(let i = 0; i < index.data.length; i += 3) {
+        const i1 = index.data[i];
+        const i2 = index.data[i + 1];
+        const i3 = index.data[i + 2];
+
+        const p1 = [position.data[i1 * size], position.data[i1 * size + 1], position.data[i1 * size + 2]];
+        const p2 = [position.data[i2 * size], position.data[i2 * size + 1], position.data[i2 * size + 2]];
+        const p3 = [position.data[i3 * size], position.data[i3 * size + 1], position.data[i3 * size + 2]];
+
+        const u1 = [uv.data[i1 * 2], uv.data[i1 * 2 + 1]];
+        const u2 = [uv.data[i2 * 2], uv.data[i2 * 2 + 1]];
+        const u3 = [uv.data[i3 * 2], uv.data[i3 * 2 + 1]];
+
+        const {tang: t, bitang: b} = getTBNTriangle(p1, p2, p3, u1, u2, u3);
+        tang.set(t, i1 * 3);
+        tang.set(t, i2 * 3);
+        tang.set(t, i3 * 3);
+        bitang.set(b, i1 * 3);
+        bitang.set(b, i2 * 3);
+        bitang.set(b, i3 * 3);
+    }
+    geometry.addAttribute('tang', { data: tang, size: 3 });
+    geometry.addAttribute('bitang', { data: bitang, size: 3 });
+    return geometry;
 }
