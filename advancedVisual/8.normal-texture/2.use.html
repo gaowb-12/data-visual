@@ -57,9 +57,6 @@
             // 3. 创建场景
             const scene = new Transform();
 
-           
-            
-
             // 5. 创建webgl程序
             const vertex = `#version 300 es
                 precision highp float;
@@ -244,6 +241,7 @@
 
                     // 取纹理坐标信息
                     vec3 tex = texture(tMap, vUv).rgb; 
+                    // 动态更新光
                     vec3 light = normalize(vec3(sin(uTime), 1.0, cos(uTime))); 
                     float shading = dot(normal, light) * 0.5;
 
@@ -289,12 +287,12 @@
             
             // 6. 创建网格对象
             const controls = new Orbit(camera);
-            console.log(geometry)
+
             createTB(geometry);
             const cube = new Mesh(gl, { geometry, program });
             cube.setParent(scene);
             cube.rotation.x = -Math.PI / 2;
-            console.log(cube)
+            
             // 7. 渲染
             requestAnimationFrame(update);
             function update(t) {

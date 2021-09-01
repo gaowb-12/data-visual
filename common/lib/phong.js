@@ -151,10 +151,12 @@ export function createTB(geometry) {
     const tang = new Float32Array(len * 3);
     const bitang = new Float32Array(len * 3);
 
-    for(let i = 0; i < index.data.length; i += 3) {
-        const i1 = index.data[i];
-        const i2 = index.data[i + 1];
-        const i3 = index.data[i + 2];
+    const ilen = index ? index.data.length : len;
+
+    for(let i = 0; i < ilen; i += 3) {
+        const i1 = index ? index.data[i] : i;
+        const i2 = index ? index.data[i + 1] : i + 1;
+        const i3 = index ? index.data[i + 2] : i + 2;
 
         const p1 = [position.data[i1 * size], position.data[i1 * size + 1], position.data[i1 * size + 2]];
         const p2 = [position.data[i2 * size], position.data[i2 * size + 1], position.data[i2 * size + 2]];
