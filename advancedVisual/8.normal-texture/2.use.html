@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.法线贴图模拟真实物体表面-法线贴图的应用</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Renderer, Camera, Transform, Program, Color, Geometry, Mesh, Texture, Orbit, Box, } from '/common/lib/ogl/index.mjs';
+        import * as dat from '/common/lib/dat.gui.js';
+        import { Phong, Material, createTB } from "/common/lib/phong.js"
+
+        // 加载纹理
+        function loadTexture(src) {
+            const texture = new Texture(gl);
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    texture.image = img;
+                    resolve(texture);
+                };
+                img.src = src;
+            });
+        }
+
+        let canvas = document.querySelector("canvas");
+        // 1. 创建画布宽高512的renderer对象
+        const renderer = new Renderer({
+            canvas,
+            width:512,
+            height:512,
+        });
+
+        const gl = renderer.gl;
+        gl.clearColor(1, 1, 1, 1);
+
+        (async function(){
+            // 2. 创建相机（默认透视投影）
+            // 视角35°
+            const camera = new Camera(gl, { fov: 35 });
+            // 相机的位置
+            camera.position.set(0, 1, 7);
+            // 相机的朝向
+            camera.lookAt([0, 0, 0]);
+
+            // 3. 创建场景
+            const scene = new Transform();
+
+           
+            
+
+            // 5. 创建webgl程序
+            const vertex = `#version 300 es
+                precision highp float;
+
+                in vec3 position;
+                in vec3 normal;
+                in vec2 uv;
+                in vec3 tang;
+                in vec3 bitang;
+
+                uniform mat4 modelMatrix;
+                uniform mat4 modelViewMatrix;
+                uniform mat4 viewMatrix;
+                uniform mat4 projectionMatrix;
+                uniform mat3 normalMatrix;
+                uniform vec3 cameraPosition;
+
+                out vec3 vNormal;
+                out vec4 vPos;
+                out vec2 vUv;
+                out vec3 vCameraPos;
+                // TBN 矩阵
+                out mat3 vTBN;
+
+                void main() {
+                    // 对几何体进行模型+视图变换，转换到相机坐标系
+                    vec4 pos = modelViewMatrix * vec4(position, 1.0);
+                    vPos = pos;
+                    vUv = uv;
+                    // 对相机位置做视图变换，转换到相机坐标系
+                    vCameraPos = (viewMatrix * vec4(cameraPosition, 1.0)).xyz;
+
+                    // 切线空间要经过法向量矩阵的转换，转换为相对于世界坐标系
+                    vNormal = normalize(normalMatrix * normal);
+                    vec3 N = vNormal;
+                    vec3 T = normalize(normalMatrix * tang);
+                    vec3 B = normalize(normalMatrix * bitang);
+
+                    // TBN矩阵传给片元着色器
+                    vTBN = mat3(T, B, N);
+                    
+                    gl_Position = projectionMatrix * pos;
+                }
+
+            `;
+            
+            const fragment = /* glsl */ `#version 300 es
+                precision highp float;
+
+                #define MAX_LIGHT_COUNT 16
+                uniform mat4 viewMatrix;
+
+                // 声明 vec3 和 float 数组，数组的大小为 16。这样，对于每一种光源，我们都可以支持 16 个。
+                uniform vec3 ambientLight;
+                uniform vec3 directionalLightDirection[MAX_LIGHT_COUNT];
+                uniform vec3 directionalLightColor[MAX_LIGHT_COUNT];
+                uniform vec3 pointLightColor[MAX_LIGHT_COUNT];
+                uniform vec3 pointLightPosition[MAX_LIGHT_COUNT];
+                uniform vec3 pointLightDecay[MAX_LIGHT_COUNT];
+                uniform vec3 spotLightColor[MAX_LIGHT_COUNT];
+                uniform vec3 spotLightDirection[MAX_LIGHT_COUNT];
+                uniform vec3 spotLightPosition[MAX_LIGHT_COUNT];
+                uniform vec3 spotLightDecay[MAX_LIGHT_COUNT];
+                uniform float spotLightAngle[MAX_LIGHT_COUNT];
+
+                // 材质相关的属性
+                uniform vec3 materialReflection;
+                uniform float shininess;
+                uniform float specularFactor;
+
+                uniform sampler2D tNormal;
+                uniform sampler2D tMap;
+                uniform float uTime;
+
+                in vec3 vCameraPos;
+                in vec3 vNormal;
+                in vec2 vUv;
+                in vec4 vPos;
+                in mat3 vTBN;
+
+                out vec4 FragColor;
+
+                // 镜面反射强度
+                float getSpecular(vec3 dir, vec3 normal, vec3 eye){
+                    // 1. 求出反射光线的方向向量
+                    vec3 reflectionLight = reflect(-dir, normal);
+                    // 2. 求反射光线与视线夹角的余弦
+                    float eyeCos = max(dot(eye, reflectionLight), 0.0);
+                    // 3.使用材质的镜面反射光洁度和材质的镜面反射强度设置镜面反射强度，指数越大，镜面越聚焦，高光的光斑范围就越小
+                    return specularFactor *  pow(eyeCos, shininess);
+                }
+
+                // 获取反射模型的颜色
+                vec4 phongReflection(vec3 pos, vec3 normal, vec3 eye) {
+                    // 镜面反射结果
+                    float specular = 0.0;  
+                    // 漫反射结果
+                    vec3 diffuse = vec3(0);
+
+                    // 处理平行光
+                    for(int i = 0; i < MAX_LIGHT_COUNT; i++) {
+                        // 取值三维坐标
+                        vec3 dir = directionalLightDirection[i];
+                        // 如果平行光是0向量，跳过处理
+                        if(dir.x == 0.0 && dir.y == 0.0 && dir.z == 0.0) continue;
+                        // 对平行光向量按照相机位置，进行视图变换
+                        vec4 d = viewMatrix * vec4(dir, 0.0);
+                        // 平行光归一化处理
+                        dir = normalize(-d.xyz);
+                        // 平行光与每点法向量的夹角余弦值
+                        float cos = max(dot(dir, normal), 0.0);
+                        // 平行光照射的强度合成
+                        diffuse += cos * directionalLightColor[i];
+                        // 平行光对几何体的镜面反射的效果
+                        specular += getSpecular(dir, normal, eye);
+                    }
+
+                    // 处理点光源
+                    for(int i = 0; i < MAX_LIGHT_COUNT; i++) {
+                        // 如果衰减系数都是0，跳过处理
+                        vec3 decay = pointLightDecay[i];    
+                        if(decay.x == 0.0 && decay.y == 0.0 && decay.z == 0.0) continue;
+
+                        // 取值三维坐标
+                        vec3 dir = (viewMatrix * vec4(pointLightPosition[i], 1.0)).xyz - pos.xyz;
+                        // 光线到点坐标的距离，用来计算衰减 
+                        float dis = length(dir);
+                        // 点光归一化处理
+                        dir = normalize(dir);
+                        // 点光与每点法向量的夹角余弦值
+                        float cos = max(dot(dir, normal), 0.0);
+                        // 计算衰减 
+                        float d = min(1.0, 1.0 / (decay.x * pow(dis, 2.0) + decay.y * dis + decay.z));
+                        // 点光照射的强度合成
+                        diffuse += d * cos * pointLightColor[i];
+                        // 点光对几何体的镜面反射的效果
+                        specular += getSpecular(dir, normal, eye);
+                    }
+
+                    // 处理聚光灯
+                    for(int i = 0; i < MAX_LIGHT_COUNT; i++) {
+                        // 如果衰减系数都是0，跳过处理
+                        vec3 decay = spotLightDecay[i];    
+                        if(decay.x == 0.0 && decay.y == 0.0 && decay.z == 0.0) continue;
+
+                        // 取值三维坐标
+                        vec3 dir = (viewMatrix * vec4(spotLightPosition[i], 1.0)).xyz - pos.xyz;
+                        // 光线到点坐标的距离，用来计算衰减 
+                        float dis = length(dir);
+                        // 聚光灯归一化处理
+                        dir = normalize(dir);
+                        // 聚光灯的朝向 
+                        vec3 spotDir = (viewMatrix * vec4(spotLightDirection[i], 0.0)).xyz;
+                        // 通过余弦值判断夹角范围 
+                        float ang = cos(spotLightAngle[i]); 
+                        // 计算聚光灯的朝向与点光源到物体表面的点坐标的方向的余弦值,比较两个夹角
+                        float r = step(ang, dot(dir, normalize(-spotDir)));
+
+                        // 聚光灯与每点法向量的夹角余弦值
+                        float cos = max(dot(dir, normal), 0.0);
+                        // 计算衰减 
+                        float d = min(1.0, 1.0 / (decay.x * pow(dis, 2.0) + decay.y * dis + decay.z));
+                        // 聚光灯照射的强度合成
+                        diffuse += r * d * cos * spotLightColor[i];
+                        // 聚光灯对几何体的镜面反射的效果
+                        specular += r * getSpecular(dir, normal, eye);
+                    }
+                    return vec4(diffuse, specular);
+                }
+
+                // 将法线贴图中的法向量 转换为 当前切线空间（相对于世界坐标系）中的实际法向量
+                vec3 getNormal() {  
+                    vec3 n = texture(tNormal, vUv).rgb * 2.0 - 1.0;  
+                    return normalize(vTBN * n);
+                }
+
+                void main() {
+                    // 根据相机位置计算对每个点的视线的向量方向
+                    vec3 eyeDirection = normalize(vCameraPos - vPos.xyz);  
+                    vec3 normal = getNormal();
+                    vec4 phong = phongReflection(vPos.xyz, normal, eyeDirection);
+
+                    // 取纹理坐标信息
+                    vec3 tex = texture(tMap, vUv).rgb; 
+                    vec3 light = normalize(vec3(sin(uTime), 1.0, cos(uTime))); 
+                    float shading = dot(normal, light) * 0.5;
+
+                    // 合成颜色
+                    // FragColor.rgb = phong.w + (phong.xyz + ambientLight) * materialReflection;
+                    FragColor.rgb = tex + shading;
+                    FragColor.a = 1.0;
+                }
+            `;
+
+            const phong = new Phong();
+            phong.addLight({  direction: [0, -3, -3],});
+            phong.addLight({  direction: [0, 3, 3],});
+            const matrial = new Material(new Color('#808080'));
+
+            const data = await (await fetch('./assets/rounded-cube.json')).json();
+            const normalMap = await loadTexture('./assets/rock_normal.jpg');
+            const tMap = await loadTexture('./assets/rock.jpg');
+
+            // 传入光的相关属性
+            const directional = {
+                vCameraPos:{ value: [0, 1, 7] },  
+                ...phong.uniforms,
+                tNormal:{ value: normalMap },
+                uTime: {value: 0},
+                tMap:{ value: tMap }
+            };
+
+            const program = new Program(gl, {
+                vertex,
+                fragment,
+                uniforms: {
+                    ...directional,
+                    ...matrial.uniforms,
+                },
+            });
+            // 4. 创建几何体对象
+            const geometry = new Geometry(gl, {
+                position: {size: 3, data: new Float32Array(data.position)},
+                uv: {size: 2, data: new Float32Array(data.uv)},
+                normal: {size: 3, data: new Float32Array(data.normal)},
+            });
+            
+            // 6. 创建网格对象
+            const controls = new Orbit(camera);
+            console.log(geometry)
+            createTB(geometry);
+            const cube = new Mesh(gl, { geometry, program });
+            cube.setParent(scene);
+            cube.rotation.x = -Math.PI / 2;
+            console.log(cube)
+            // 7. 渲染
+            requestAnimationFrame(update);
+            function update(t) {
+                requestAnimationFrame(update);
+                controls.update();
+                program.uniforms.uTime.value = t * 0.001;
+                renderer.render({scene, camera});
+            }
+        })()
+    </script>
+</body>
+</html>
