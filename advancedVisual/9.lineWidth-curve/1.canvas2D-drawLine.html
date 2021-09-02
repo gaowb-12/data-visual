@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1.绘制带宽度的曲线-用 Canvas2D 绘制带宽度的曲线</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+
+        // 绘制带宽度的曲线
+        // function drawPolyline(context, points, {lineWidth = 1, lineJoin = 'miter', lineCap = 'butt'} = {}){
+        //     context.lineWidth = lineWidth;  
+        //     context.lineJoin = lineJoin; 
+        //     context.lineCap = lineCap;
+        //     context.beginPath();
+        //     context.moveTo(...points[0]);
+        //     for (let i = 1; i < points.length; i++) {
+        //         context.lineTo(...points[i]);
+        //     }
+        //     context.stroke();
+        // }
+        // 设置 Canvas2D 上下文的 miterLimit 属性(miterLimit 属性就会限制尖角的最大值)
+        function drawPolyline(context, points, {lineWidth = 1, lineJoin = 'miter', lineCap = 'butt', miterLimit = 10} = {}){
+            context.lineWidth = lineWidth;  
+            context.lineJoin = lineJoin; 
+            context.lineCap = lineCap;
+            context.miterLimit = miterLimit;
+            context.beginPath();
+            context.moveTo(...points[0]);
+            for (let i = 1; i < points.length; i++) {
+                context.lineTo(...points[i]);
+            }
+            context.stroke();
+        }
+        
+        const points = [
+            [100, 100],
+            [100, 200],
+            [200, 150],
+            [300, 200],
+            [300, 100],
+        ];
+        ctx.strokeStyle = 'red';
+        // drawPolyline(ctx, points, {lineWidth: 10});
+        drawPolyline(ctx, points, {lineWidth: 10, lineCap: 'round', lineJoin: 'miter', miterLimit: 1.5});
+        ctx.strokeStyle = 'blue';
+        drawPolyline(ctx, points);
+    </script>
+</body>
+</html>

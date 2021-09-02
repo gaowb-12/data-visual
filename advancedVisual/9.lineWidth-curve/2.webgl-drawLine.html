@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.绘制带宽度的曲线-用 webgl 绘制带宽度的曲线</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Renderer, Program, Geometry, Transform, Mesh } from '/common/lib/ogl/index.mjs';
+        import * as dat from '/common/lib/dat.gui.js';
+
+        let canvas = document.querySelector("canvas");
+
+        // 1. 创建画布宽高512的renderer对象
+        const renderer = new Renderer({
+            canvas,
+            width:512,
+            height:512,
+        });
+
+        const gl = renderer.gl;
+        gl.clearColor(1, 1, 1, 1);
+
+        (async function(){
+            
+            // 2. 创建相机（默认透视投影）
+
+            // 3. 创建场景
+            const scene = new Transform();
+
+            // 4. 创建几何体对象
+            
+            // 5. 创建webgl程序
+            const vertex = /* glsl */ `
+            precision highp float;
+            
+            attribute vec2 position;
+            
+            void main() {
+                gl_PointSize = 10.0;
+                // 归一化处理
+                float scale = 1.0 / 256.0;
+                mat3 projectionMatrix = mat3(      
+                    scale, 0, 0,      
+                    0, -scale, 0,      
+                    -1, 1, 1    
+                );
+                vec3 pos = projectionMatrix * vec3(position, 1.0);
+                gl_Position = vec4(pos.xy, 0, 1);
+            }
+            `;
+            
+            const fragment = /* glsl */ `
+                precision highp float;  
+                void main() {    
+                    gl_FragColor = vec4(1, 0, 0, 1);  
+                }
+            `;
+            
+            const program = new Program(gl, {
+                vertex,
+                fragment,
+            });
+            const geometry = new Geometry(gl, {
+                position: { 
+                    size: 2, 
+                    data: new Float32Array( [ 100, 100, 100, 200, 200, 150, 300, 200, 300, 100, ], )
+                },
+            });
+            // 6. 创建网格对象
+            const polyline = new Mesh(gl, {  geometry, program, mode: gl.LINE_STRIP });
+            polyline.setParent(scene);
+            
+            // 7. 渲染
+            renderer.render({ scene });
+
+        })()
+    </script>
+</body>
+</html>
