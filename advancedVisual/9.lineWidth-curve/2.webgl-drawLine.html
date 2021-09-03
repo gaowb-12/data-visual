@@ -20,6 +20,13 @@
         import { Renderer, Program, Geometry, Transform, Mesh } from '/common/lib/ogl/index.mjs';
         import * as dat from '/common/lib/dat.gui.js';
 
+        // 通过挤压实现线宽
+        function extrudePolyline(gl, points, {thickness = 10} = {}){
+            const halfThick = 0.5 * thickness; 
+            const innerSide = []; 
+            const outerSide = [];
+        }
+
         let canvas = document.querySelector("canvas");
 
         // 1. 创建画布宽高512的renderer对象
