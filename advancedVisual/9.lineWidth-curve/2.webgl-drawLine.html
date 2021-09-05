@@ -19,12 +19,77 @@
     <script type="module">
         import { Renderer, Program, Geometry, Transform, Mesh } from '/common/lib/ogl/index.mjs';
         import * as dat from '/common/lib/dat.gui.js';
+        import { Vec2 } from '/common/lib/math/Vec2.js';
 
         // 通过挤压实现线宽
         function extrudePolyline(gl, points, {thickness = 10} = {}){
             const halfThick = 0.5 * thickness; 
             const innerSide = []; 
             const outerSide = [];
+
+            // 构建挤压顶点
+            for (let i = 1; i < points.length - 1; i++) {
+                const point = points[i];
+                const v1 = (new Vec2()).sub(point, points[i-1]).normalize();
+                const v2 = (new Vec2()).sub(point, points[i+1]).normalize();
+                // 得到挤压方向
+                const v = (new Vec2()).add(v1, v2).normalize();
+                // 法线方向
+                const norm = new Vec2(-v1.y, v1.x);
+                // 通过点乘计算法线与挤压方向的余弦值
+                const cos = norm.dot(v);
+                //计算挤压方向的线宽（这里计算的是一半的距离）
+                const len = halfThick / cos;
+
+                // 处理起始点
+                if(i === 1){
+                    // 起始点的法向量方向就是挤压方向，直接将挤压方向想扩大为线宽的一半
+                    const v0 = new Vec2(...norm).scale(halfThick);
+                    // 将法向量的相反两个方向作为线宽的内外挤压方向，外为相加，内为相减
+                    outerSide.push((new Vec2()).add(points[0], v0));
+                    innerSide.push((new Vec2()).sub(points[0], v0));
+                }
+                // 计算拐点处挤压方向的向量
+                v.scale(len);
+                // 将拐点处挤压方向的相反两个方向作为线宽的内外挤压方向，外为相加，内为相减
+                outerSide.push((new Vec2()).add(point, v));
+                innerSide.push((new Vec2()).sub(point, v));
+
+                // 处理结束点
+                if(i === points.length-2){
+                    const norm2 = new Vec2(v2.y, -v2.x); 
+                    const v0 = new Vec2(...norm2).scale(halfThick);
+                    // 将法向量的相反两个方向作为线宽的内外挤压方向，外为相加，内为相减
+                    outerSide.push((new Vec2()).add(points[points.length-1], v0));
+                    innerSide.push((new Vec2()).sub(points[points.length-1], v0));
+                }
+            }
+
+            // 构建对应的Geometry对象
+            const count = innerSide.length * 4 - 4;
+            // 线宽的顶点集合
+            const position = new Float32Array(count * 2);
+            // 三角剖分后的顶点索引集合
+            const index = new Uint16Array(6 * count / 4);
+
+            // 创建Geometry对象
+            for(let i = 0; i < innerSide.length - 1; i++) {
+                // 获取四个顶点，每四个相邻顶点构成两个三角形（除了收尾的四个顶点外，其余顶点重复两次）
+                const a = innerSide[i],
+                    b = outerSide[i],
+                    c = innerSide[i + 1],
+                    d = outerSide[i + 1];
+
+                const offset = i * 4;
+                // 根据innerSide 和 outerSide中的顶点来构建三角剖分的几何体顶点数据
+                index.set([offset, offset + 1, offset + 2, offset + 2, offset + 1, offset + 3], i * 6);    
+                // 将内外顶点按照一定的顺序排列
+                position.set([...a, ...b, ...c, ...d], i * 8);
+            }
+            return new Geometry(gl, {
+                position:{ size: 2, data: position },
+                index:{ data: index }
+            });
         }
 
         let canvas = document.querySelector("canvas");
@@ -79,14 +144,15 @@
                 vertex,
                 fragment,
             });
-            const geometry = new Geometry(gl, {
-                position: { 
-                    size: 2, 
-                    data: new Float32Array( [ 100, 100, 100, 200, 200, 150, 300, 200, 300, 100, ], )
-                },
-            });
+            let points = [];
+            let a = [ 100, 100, 100, 200, 200, 150, 300, 200, 300, 100];
+            for (let j = 0; j < a.length; j+=2) {
+                points.push(new Vec2(a[j],a[j+1]));
+            }
+            const geometry = extrudePolyline(gl, points, { lineWidth: 10 });
+
             // 6. 创建网格对象
-            const polyline = new Mesh(gl, {  geometry, program, mode: gl.LINE_STRIP });
+            const polyline = new Mesh(gl, {  geometry, program, mode: gl.TRIANGLE });
             polyline.setParent(scene);
             
             // 7. 渲染
