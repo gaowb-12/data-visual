@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1.实现简单的3D可视化图表-</title>
+    <style>
+        #stage {
+            border: 1px solid #ccc;
+            width: 600px;
+            height: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div id="stage"></div>
+    <script src="https://unpkg.com/spritejs/dist/spritejs.min.js"></script>
+    <script src="https://d3js.org/d3.v6.js"></script>
+
+    <script type="module">
+        import {Scene} from 'https://unpkg.com/spritejs/dist/spritejs.esm.js';
+        import {Cube, Light, shaders} from 'https://unpkg.com/sprite-extend-3d/dist/sprite-extend-3d.esm.js';
+
+        let cache = null;
+        // 根据传入的时间对数据进行过滤
+        async function getData(toDate = new Date()) {
+            if(!cache) {
+                const data = await (await fetch('./github_contributions_akira-cn.json')).json();
+                cache = data.contributions.map((o) => {
+                    o.date = new Date(o.date.replace(/-/g, '/'));
+                    return o;
+                });
+            }
+            // 要拿到 toData 日期之前大约一年的数据（52周）
+            let start = 0, end = cache.length;
+            // 用二分法查找
+            while(start < end - 1) {
+                const mid = Math.floor(0.5 * (start + end));
+                const {date} = cache[mid];
+                if(date <= toDate) end = mid;
+                else start = mid;
+            }
+            // 获得对应的一年左右的数据
+            let day;
+            if(end >= cache.length) {
+                day = toDate.getDay();
+            } else {
+                const lastItem = cache[end];
+                day = lastItem.date.getDay();
+            }
+            // 根据当前星期几，再往前拿52周的数据
+            const len = 7 * 52 + day + 1;
+            const ret = cache.slice(end, end + len);
+            if(ret.length < len) {
+                // 日期超过了数据范围，补齐数据
+                const pad = new Array(len - ret.length).fill({count: 0, color: '#ebedf0'});
+                ret.push(...pad);
+            }
+            return ret;
+        }
+
+
+        (async function(){
+            // 1. 创建场景，树的根节点，SpriteJS 中渲染图形，都要在这个“场景”中进行。
+            const container = document.getElementById('stage');
+            const scene = new Scene({
+                container,
+                displayRatio: 2, // 设置显示分辨率
+            });
+    
+    
+            // 2. 创建layer对象，一个layer对象表示一个图层，对应一个canvas
+            const layer = scene.layer3d('fglayer', {
+                camera: {
+                    fov: 35, // 相机视角
+                },
+            });
+            // 相机位置位置
+            layer.camera.attributes.pos = [2, 6, 9];
+            // 相机朝向
+            layer.camera.lookAt([0, 0, 0]);
+    
+            // 3. 将数据转换成柱状元素
+    
+            // 创建着色器程序（spritejs内置了支持phong反射模型的一组着色器，shaders.GEOMETRY.vertex）
+            const program = layer.createProgram({
+                vertex: shaders.GEOMETRY.vertex,
+                fragment: shaders.GEOMETRY.fragment,
+            });
+            // 创建好 WebGL 程序之后，我们就可以获取数据，通过d3用数据来操作文档树了。
+            const dataset = await getData(new Date("2020-06-25 00:00:00")); // dataset = { count: 0, color: "#ebedf0" }
+            console.log(dataset)
+            // 返回数据集合中的最大值，作为柱状图Y轴的最大值
+            const max = d3.max(dataset, (a)=>{
+                return a.count;
+            });
+            const selection = d3.select(layer);
+            
+            // 将数据绑定到cube(立方体元素)上
+            const chart  =  selection.selectAll("cube")
+                            .data(dataset)
+                            .enter() // d3处理数据多于元素时
+                            .append(() => {
+                                // 添加cube元素
+                                return new Cube(program); 
+                            })
+                            .attr('width', 0.14)
+                            .attr('depth', 0.14)
+                            .attr('height', 1)
+                            .attr('scaleY', (d) => { 
+                                // 每个立方体元素与Y轴最大值所占的比值
+                                return d.count / max; 
+                            })
+                            .attr('pos',(d, i) => {
+                                // pos是根据数据的索引设置x和z
+                                const x0 = -3.8 + 0.0717 + 0.0015;
+                                const z0 = -0.5 + 0.05 + 0.0015;
+                                // x轴表示了以周为单位的时间线
+                                const x = x0 + 0.143 * Math.floor(i / 7);
+                                // z轴表示每周的星期几
+                                const z = z0 + 0.143 * (i % 7); 
+                                return [x, 0.5 * d.count / max, z];
+                            })
+                            .attr('colors', (d, i) => {
+                                return d.color;
+                            });
+
+        })();
+    </script>
+</body>
+</html>
