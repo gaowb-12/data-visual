@@ -72,6 +72,7 @@
     
             // 2. 创建layer对象，一个layer对象表示一个图层，对应一个canvas
             const layer = scene.layer3d('fglayer', {
+                ambientColor: [0.5, 0.5, 0.5, 1],//增加环境光效果
                 camera: {
                     fov: 35, // 相机视角
                 },
@@ -80,6 +81,13 @@
             layer.camera.attributes.pos = [2, 6, 9];
             // 相机朝向
             layer.camera.lookAt([0, 0, 0]);
+
+            // 增加平行光
+            const light = new Light({ 
+                direction: [-3, -3, -1], 
+                color: [1, 1, 1, 1],
+            });
+            layer.addLight(light);
     
             // 3. 将数据转换成柱状元素
     
@@ -90,7 +98,7 @@
             });
             // 创建好 WebGL 程序之后，我们就可以获取数据，通过d3用数据来操作文档树了。
             const dataset = await getData(new Date("2020-06-25 00:00:00")); // dataset = { count: 0, color: "#ebedf0" }
-            console.log(dataset)
+            
             // 返回数据集合中的最大值，作为柱状图Y轴的最大值
             const max = d3.max(dataset, (a)=>{
                 return a.count;
@@ -110,21 +118,72 @@
                             .attr('height', 1)
                             .attr('scaleY', (d) => { 
                                 // 每个立方体元素与Y轴最大值所占的比值
-                                return d.count / max; 
+                                // return d.count / max; 
+                                return 0.01; 
                             })
                             .attr('pos',(d, i) => {
                                 // pos是根据数据的索引设置x和z
+                                // x0, z0根据不同天对应图表中的格子
                                 const x0 = -3.8 + 0.0717 + 0.0015;
                                 const z0 = -0.5 + 0.05 + 0.0015;
                                 // x轴表示了以周为单位的时间线
                                 const x = x0 + 0.143 * Math.floor(i / 7);
                                 // z轴表示每周的星期几
                                 const z = z0 + 0.143 * (i % 7); 
-                                return [x, 0.5 * d.count / max, z];
+                                // 由于 Cube 的坐标基于中心点对齐的，现在我们想让它们变成底部对齐，所以需要把 y 设置为 d.count/max 的一半。
+                                // return [x, 0.5 * d.count / max, z];
+                                return [x, 0, z];
                             })
                             .attr('colors', (d, i) => {
                                 return d.color;
                             });
+            // 创建一个线性的缩放过程
+            const linear = d3.scaleLinear()
+            .domain([0, max])
+            .range([0, 1.0]);
+
+            // 实现线性动画
+            chart.transition()
+            .duration(2000)
+            .attr('scaleY', (d, i) => {
+                return linear(d.count);
+            })
+            .attr('y', (d, i) => {
+                return 0.5 * linear(d.count);
+            });
+
+            // 给柱状图添加底座
+            const fragment = `
+                precision highp float;
+                precision highp int;
+                varying vec4 vColor;
+                varying vec2 vUv;
+
+                void main(){
+                    float x = fract(vUv.x * 53.0);
+                    float y = fract(vUv.y * 7.0);
+                    x = smoothstep(0.0, 0.1, x) - smoothstep(0.9, 1.0, x);
+                    y = smoothstep(0.0, 0.1, y) - smoothstep(0.9, 1.0, y);
+                    gl_FragColor = vColor * (x + y);
+                }
+                            
+            `
+            // 创建纹理着色器程序
+            const axisProgram = layer.createProgram({ 
+                vertex: shaders.TEXTURE.vertex, 
+                fragment,
+            });
+
+            const ground = new Cube(axisProgram, {  
+                width: 7.6,  
+                height: 0.1,  
+                y: -0.049, // not 0.05 to avoid z-fighting  
+                depth: 1,  
+                colors: 'rgba(0, 0, 0, 0.1)',
+            });
+            layer.append(ground);
+
+            layer.setOrbit();
 
         })();
     </script>
