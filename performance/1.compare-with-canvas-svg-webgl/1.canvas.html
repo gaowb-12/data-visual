@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1. 影响 Canvas 渲染性能的 2 大要素</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+
+     <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        
+        const canvas = document.querySelector('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+
+        function randomColor() {
+            return `hsl(${Math.random() * 360}, 100%, 50%)`;
+        }
+
+        function drawCircle(context, radius) {
+            const x = Math.random() * WIDTH;
+            const y = Math.random() * HEIGHT;
+            const fillColor = randomColor();
+            context.fillStyle = fillColor;
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI * 2);
+            context.fill();
+        }
+
+        // 总的来说，Canvas2D 绘制图形的性能还是比较高的。
+        // 在普通的个人电脑上，我们要绘制的图形不太大时，只要不超过 500 个都可以达到 60fps，1000 个左右其实也能达到 50fps，
+        // 就算要绘制大约 3000 个图形，也能够保持在可以接受的 24fps 以上。
+        function draw(context, count = 500, radius = 10) {
+            for(let i = 0; i < count; i++) {
+                drawCircle(context, radius);
+            }
+        }
+
+        requestAnimationFrame(function update() {
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            draw(ctx);
+            requestAnimationFrame(update);
+        });
+    </script>
+</body>
+</html>
