@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5. 怎么给canvas绘制加速-手段四：局部重绘</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas width="600" height="600"></canvas>
+
+    <script type="module">
+        /**
+         * 使用 Canvas 上下文的 clip 方法，它是一种特殊的绘图指令，可以设定一个绘图区，让图形的绘制限制在这个绘图区内部
+         * 超过 clip 范围的部分，浏览器就不会把它渲染到 Canvas 上。
+         * 
+         * 区域范围的计算：我们可以使用动态计算要重绘区域的技术，它也被称为脏区检测。它的基本原理是根据动态元素的包围盒，动态算出需要重绘的范围。
+         * 
+         * 包围盒：能包含多边形所有顶点，并且与x轴平行的最小矩形
+         * */ 
+
+    </script>
+</body>
+</html>

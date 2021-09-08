@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3. 怎么给canvas绘制加速-手段二：使用缓存</title>
+    <title>6. 怎么给canvas绘制加速-手段五：优化滤镜</title>
     <style>
         canvas{
             border: 1px solid #ccc;
@@ -18,7 +18,6 @@
     <script type="module">
         const canvas = document.querySelector('canvas');
         const ctx = canvas.getContext('2d');
-
 
         // 创建正多边形，返回顶点
         function regularShape(x, y, r, edges = 3) {
@@ -49,53 +48,37 @@
 
         // 多边形类型，包括正三角形、正四边形、正五边形、正六边形和正100边形
         const shapeTypes = [3, 4, 5, 6, -1];
-        const TAU = 2 * Math.PI;
-
-
-        // 创建缓存函数()
-        function createCache(){
-            const ret = [];
-            for(let i = 0; i < shapeTypes.length; i++) {
-                // 创建离屏canvas缓存图形
-                const cacheCanvas = new OffscreenCanvas(20, 20);
-                // 将图像绘制到离屏canvas图像上
-                const type = shapeTypes[i];
-                const context = cacheCanvas.getContext('2d'); 
-                context.fillStyle = 'red'; 
-                context.strokeStyle = 'black';
-                if(type > 0){
-                    // 画正多边形
-                    const points = regularShape(10, 10, 10, type);
-                    drawShape(context, points);
-                }else{
-                    // 画圆 
-                    context.beginPath(); 
-                    context.arc(10, 10, 10, 0, TAU); 
-                    context.stroke(); 
-                    context.fill();
-                }
-                ret.push(cacheCanvas);
-            }
-            // 将离屏Canvas数组（缓存对象）返回
-            return ret;
-        }
-
-        const shapes = createCache();
         const COUNT = 1000;
+        const TAU = 2 * Math.PI;
 
         // 执行绘制
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.filter = 'blur(5px)';// 滤镜导致页面帧率下降，变得非常卡顿
+            
             for(let i = 0; i < COUNT; i++) {
-                const shape = shapes[Math.floor(Math.random() * shapeTypes.length)];
+
+                // 替代：对于半径为 10 的小图形来说，正 100 边形已经完全是正圆形了，所以我们可以用 arc 指令来替代 for 循环。
+                // 用 -1 代替正 100 边形，然后判断 type 是否大于 0，如果是就用之前的方式绘制正多边形，否则用 arc 指令来画圆
+                const type = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
-
-                // 原本数量非常多的绘图指令优化成了只有 drawImage 的一条指令，让渲染帧率达到了 60fps，从而大大提升了性能。
-                ctx.drawImage(shape, x, y);
+                if(type > 0){
+                    // 画正多边形
+                    const points = regularShape(x, y, 10, type);
+                    drawShape(ctx, points);
+                }else{
+                    // 画圆 
+                    ctx.beginPath(); 
+                    ctx.arc(x, y, 10, 0, TAU); 
+                    ctx.stroke(); 
+                    ctx.fill();
+                }
             }
             requestAnimationFrame(draw);
         }
+
         draw();
 
     </script>
