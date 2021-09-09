@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7. 怎么给canvas绘制加速-手段六：多线程渲染</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas width="600" height="600"></canvas>
+
+    <script type="module">
+        const canvas = document.querySelector('canvas');
+
+        const worker = new Worker('./random_shapes_worker.js');
+        console.dir(canvas)
+        const ofc = canvas.transferControlToOffscreen();
+        
+        worker.postMessage({
+            canvas:ofc,
+            type:"init"
+        },[ofc]);
+
+    </script>
+</body>
+</html>
