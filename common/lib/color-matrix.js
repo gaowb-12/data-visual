@@ -23,8 +23,14 @@ export function transformColor(color, ...matrix) {
   color[3] = matrix[15] * r + matrix[16] * g + matrix[17] * b + matrix[18] * a + matrix[19];
   return color;
 }
-
+/**
+ * 矩阵乘法：
+ * 这两个参数在程序中表示 a * b，也就是先做b变换，再做a变换；也就是用b的行乘以a的列
+ * @param { Array } b 对应于第一次变换矩阵
+ * @param { Array } a 对应于第二次变换矩阵
+*/
 export function multiply(a, b) {
+  // 这里的a、b矩阵虽然是4*5的矩阵（实际省略了第5行），所以乘法时仍然可以计算
   const out = [];
   const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3], a04 = a[4]; // eslint-disable-line one-var-declaration-per-line
   const a10 = a[5], a11 = a[6], a12 = a[7], a13 = a[8], a14 = a[9]; // eslint-disable-line one-var-declaration-per-line

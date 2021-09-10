@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4. 怎么给webgl绘制加速-动态批量绘制</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas width="600" height="600"></canvas>
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        
+        // 生成随机的三角形顶点
+        function randomShape(x = 0, y = 0, edges = 3, rotation = 0.0, radius = 0.1) {
+            const a0 = rotation;
+            const delta = 2 * Math.PI / edges;
+            const positions = [];
+            const cells = [];
+            for(let i = 0; i < edges; i++) {
+                const angle = a0 + i * delta;
+                positions.push([x + radius * Math.sin(angle), y + radius * Math.cos(angle)]);
+                if(i > 0 && i < edges - 1) {
+                    cells.push([0, i, i + 1]);
+                }
+            }
+            return {positions, cells};
+        }
+
+        /**
+         * 批量创建图形，将图形的顶点和索引合并
+         * @param {Number} count 要绘制的图形的数量
+         * */ 
+        function createShapes(count){
+            const positions = new Float32Array(count * 6 * 3); // 将图形都按照六边形（6个顶点）保存，并且每个顶点按三维向量（x、y、z）计算
+            const cells = new Float32Array(count * 4 * 3); // 每个六边形被切割为四个三角形，也就有四组索引，每组索引都是三个索引值
+
+            let offset = 0;// 顶点偏移
+            let cellsOffset = 0;// 索引偏移
+            for(let i = 0; i < count; i++) {
+                // 生成随机边（随机正多边形）
+                const edges = 3 + Math.floor(4 * Math.random());
+                // 多边形的每个内角大小
+                const delta = 2 * Math.PI / edges;
+
+                for(let j = 0; j < edges; j++) {
+                    const angle = j * delta;
+                    // 处理每个图形的顶点，将每个图形的顶点数据信息存入，i作为id存入
+                    positions.set([0.1 * Math.sin(angle), 0.1 * Math.cos(angle), i], (offset + j) * 3); 
+                    if(j > 0 && j < edges - 1) {
+                        // 计算顶点索引
+                        cells.set([offset, offset + j, offset + j + 1], cellsOffset);
+                        cellsOffset += 3;
+                    }
+                }
+                offset += edges;
+            }
+            return { positions, cells };
+        }
+
+        let canvas = document.querySelector("canvas");
+        const renderer = new GlRenderer(canvas);
+
+        (async function(){
+           
+            const vertex = /* glsl */ `
+                precision highp float;
+                
+                attribute vec3 a_vertexPosition;
+                attribute float id;
+
+                uniform float uTime;
+
+                highp float random(vec2 co) {  
+                    highp float a = 12.9898;  
+                    highp float b = 78.233;  
+                    highp float c = 43758.5453;  
+                    highp float dt= dot(co.xy ,vec2(a,b));  
+                    highp float sn= mod(dt,3.14);  
+                    return fract(sin(sn) * c);
+                }
+
+                varying vec3 vColor;
+                
+                void main() {
+                    float t = a_vertexPosition.z / 10000.0;
+                    float alpha = 6.28 * random(vec2(uTime, 2.0 + t)); 
+                    float c = cos(alpha); 
+                    float s = sin(alpha);
+                    mat3 modelMatrix = mat3(    
+                        c, -s, 0,    
+                        s, c, 0,    
+                        2.0 * random(vec2(uTime, t)) - 1.0, 2.0 * random(vec2(uTime, 1.0 + t)) - 1.0, 1  
+                    );
+                    vColor = vec3(    
+                        random(vec2(uTime, 4.0 + t)),    
+                        random(vec2(uTime, 5.0 + t)),    
+                        random(vec2(uTime, 6.0 + t))  
+                    );
+                    vec3 pos = modelMatrix * vec3(a_vertexPosition.xy, 1);
+                    gl_Position = vec4(pos, 1);
+                }
+            `;
+            
+            const fragment = /* glsl */ `
+                precision highp float;
+
+                varying vec3 vColor;
+                
+                void main() {
+                    gl_FragColor = vec4(vColor,1.0);  
+                }
+            `;
+            
+            const program = renderer.compileSync(fragment, vertex);
+            renderer.useProgram(program);
+
+
+            const COUNT = 3000;
+
+            const {positions, cells} = createShapes(COUNT);
+
+            renderer.setMeshData([{
+                positions,
+                cells,
+            }]);
+
+            function render(t) {
+                renderer.uniforms.uTime = t;
+                renderer.render();
+                requestAnimationFrame(render);
+            }
+
+            render(0);
+
+        })()
+
+    </script>
+</body>
+</html>
