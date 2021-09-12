@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1.针对海量数据优化性能-实例化渲染（批量渲染）</title>
+    <style>
+        canvas{
+            border:1px solid #aaa;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="400" height="400"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+
+    <script type="module">
+        /**
+         * gl-renderer 在 WebGL 底层的基础上进行了一些简单的封装，以便于我们将重点放在提供几何数据、设置变量和编写 Shader 上，不用因为创建 buffer 等细节而分心
+         * 第一步: 创建 Renderer 对象
+         * 第二步: 创建并启用 WebGL 程序
+         * 第三步: 设置 uniform 变量
+         * 第四步: 将顶点数据送入缓冲区
+         * 第五步: 渲染
+        */
+
+        // 第一步:
+        
+        
+        const canvas = document.querySelector('canvas');
+        const renderer = new GlRenderer(canvas);
+
+        const vertex = `
+            attribute vec2 a_vertexPosition;
+            attribute vec4 color;
+            attribute vec2 xy;
+            attribute float bias;
+            uniform float uTime;
+
+            varying vec4 vColor;
+
+            void main() {
+                vec3 pos = vec3(a_vertexPosition, 1);
+                float scale = 0.7 + 0.3 * sin(6.28 * bias + 0.003 * uTime);
+                mat3 m = mat3(
+                    scale, 0, 0,
+                    0, scale, 0,
+                    xy, 1
+                );
+                vColor = color;
+                gl_Position = vec4(m * pos, 1);
+            }
+        `;
+
+        const fragment = `
+            #ifdef GL_ES
+            precision highp float;
+            #endif
+
+
+            varying vec4 vColor;
+            
+            void main() {
+                gl_FragColor = vColor;
+            }
+        `;
+        const program = renderer.compileSync(fragment, vertex);
+        renderer.useProgram(program);
+
+        function circle(radius = 0.05) {
+            const delta = 2 * Math.PI / 32;
+            const positions = [];
+            const cells = [];
+            for(let i = 0; i < 32; i++) {
+                const angle = i * delta;
+                positions.push([radius * Math.sin(angle), radius * Math.cos(angle)]);
+                if(i > 0 && i < 31) {
+                    cells.push([0, i, i + 1]);
+                }
+            }
+            return {positions, cells};
+        }
+
+        const COUNT = 200000;
+        function init() {
+        const {positions, cells} = circle();
+        const colors = [];
+        const pos = [];
+        const bias = [];
+            for(let i = 0; i < COUNT; i++) {
+                const x = 2 * Math.random() - 1;
+                const y = 2 * Math.random() - 1;
+                const rotation = 2 * Math.PI * Math.random();
+
+                colors.push([
+                    Math.random(),
+                    Math.random(),
+                    Math.random(),
+                1
+                ]);
+
+                pos.push([
+                    2 * Math.random() - 1,
+                    2 * Math.random() - 1
+                ]);
+
+                bias.push(
+                    Math.random()
+                );
+            }
+        
+            renderer.uniforms.uTime = 0;
+            renderer.setMeshData({
+                positions,
+                cells,
+                instanceCount: COUNT,
+                attributes: {
+                    color: {data: [...colors], divisor: 1},
+                    xy: {data: [...pos], divisor: 1},
+                    bias: {data: [...bias], divisor: 1},
+                },
+            });
+        }
+        init();
+
+        function update(t) {
+            renderer.uniforms.uTime = t;
+            renderer.render();
+            requestAnimationFrame(update);
+        }
+
+        update(0);
+    </script>
+</body>
+</html>
