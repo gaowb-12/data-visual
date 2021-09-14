@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6.实战（一）：如何使用图表库绘制常用数据图表-QCharts 绘制图表组合</title>
+    <style>
+        #app{
+            border:1px solid #ccc;
+            width:1000px;
+            height:600px;
+        }
+    </style>
+</head>
+<body>
+    <p>
+        qcharts图表由图表（chart）对象及其子元素构成。其中图表对象的子元素包含图形（Visual）和其他插件（Plugin）。图形是必选元素，其他的插件都是可选元素
+    </p>
+    <div id="app"></div>
+
+    <script src="https://unpkg.com/spritejs/dist/spritejs.min.js"></script>
+    <script src="https://unpkg.com/@qcharts/core@1.0.25/dist/index.js"></script>
+
+    <script type="module">
+        // Line->Area：折线图-折线面积图
+        // Bar-柱状图
+        const { Chart, Line, Bar, Axis, Legend, Tooltip, Gauge } = qcharts;
+
+        // 1.创建图表对象
+        const chart = new Chart({
+            container:"#app"
+        });
+
+        // 2.创建完图表对象之后，就绑定数据
+        
+        
+        const data = [
+            { date: "1月", catgory: "降水量", val: 15.2 },
+            { date: "2月", catgory: "降水量", val: 19.2 },
+            { date: "3月", catgory: "降水量", val: 11.2 },
+            { date: "4月", catgory: "降水量", val: 45.2 },
+            { date: "5月", catgory: "降水量", val: 55.2 },
+            { date: "6月", catgory: "降水量", val: 75.2 },
+            { date: "7月", catgory: "降水量", val: 95.2 },
+            { date: "8月", catgory: "降水量", val: 135.2 },
+            { date: "9月", catgory: "降水量", val: 162.2 },
+            { date: "10月", catgory: "降水量", val: 32.2 },
+            { date: "11月", catgory: "降水量", val: 32.2 },
+            { date: "12月", catgory: "降水量", val: 15.2 },
+
+            { date: "1月", catgory: "气温", val: 2.2 },
+            { date: "2月", catgory: "气温", val: 3.2 },
+            { date: "3月", catgory: "气温", val: 5.2 },
+            { date: "4月", catgory: "气温", val: 6.2 },
+            { date: "5月", catgory: "气温", val: 8.2 },
+            { date: "6月", catgory: "气温", val: 15.2 },
+            { date: "7月", catgory: "气温", val: 25.2 },
+            { date: "8月", catgory: "气温", val: 23.2 },
+            { date: "9月", catgory: "气温", val: 24.2 },
+            { date: "10月", catgory: "气温", val: 16.2 },
+            { date: "11月", catgory: "气温", val: 12.2 },
+            { date: "12月", catgory: "气温", val: 6.6 },
+        ];
+
+        // chart.source方法进行数据绑定。并且可以设置数据的行、数值、文本等，这些设置会被图形或其他插件使用
+        chart.source(data,{
+            row:"catgory", // 指定数据的行
+            value:"val", // 指定数据的数值
+            text:"date", // 指定数据的文本
+        });
+
+        // // 3.指定图形对象(面积图)
+        // const line = new Line({ axisGap: true });
+        
+        
+        
+        // 通过chart.dataset拿到绑定的数据集
+        const ds = chart.dataset;
+        // 通过 selectRows 分别将降水量和气温数据过滤出来
+        const d1 = ds.selectRows("降水量");
+        const line = new Line({ axisGap: true })
+        .source(d1)
+        .style("point", { strokeColor: "#fff" });
+        
+        const d2 = ds.selectRows("气温");
+        const bar = new Bar().source(d2);
+        bar.style("pillar", { fillColor: "#6CD3FF" });
+        
+
+        // 4.添加插件，实现坐标轴、图例等
+        // 4.1增加两个坐标轴，底部跟左侧的(默认在底部)，.style改变样式
+        const axis = new Axis().style("grid",false);//grid=false,不会出现纵向网格线
+        // 4.2增加左侧坐标纵轴
+        const axisLeft = new Axis({orient:"left"}).style("axis",false);//axis=false,不显示坐标轴实线
+        // 4.3添加图例
+        const legend = new Legend();
+        // 4.4添加提示条
+        const tooltip = new Tooltip();
+
+
+        // 5.添加到 chart 对象的子元素中去(显示)
+        chart.append([ line, bar, legend, axis, axisLeft, tooltip ]);
+
+    </script>
+</body>
+</html>
