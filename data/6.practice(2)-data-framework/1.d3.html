@@ -23,7 +23,7 @@
     <script src="https://d3js.org/d3.v6.js"></script>
 
     <script type="module">
-        const {Scene, Sprite} = spritejs;
+        const {Scene, Sprite, SpriteSvg } = spritejs;
 
         // 1.通过spritejs创建场景（作为其他元素的根元素容器）
         const container = document.getElementById("stage");
@@ -43,12 +43,49 @@
                     .domain([ 100, d3.max(dataset) ])
                     .range([ 0, 500 ]);
 
-        // 3.
+        // 3.有了dataset和scale函数之后，使用d3-selection创建并选择layer对象
+        // 在spritejs中，场景可以由多个layer组成，针对每个layer，spritejs都会创建一个实际的canvas画布。
+        const fglayer = scene.layer('fglayer');
+        const s = d3.select(fglayer);
 
+        // 4.在fglayer对象上进行迭代操作
+        const colors = ['#fe645b', '#feb050', '#c2af87', '#81b848', '#55abf8'];
+        const chart = s.selectAll("sprite")
+            .data(dataset)
+            .enter()
+            .append('sprite')
+            .attr("x",200)
+            .attr("y",(d, i)=>{
+                return 200 + i * 95;
+            })
+            .attr('width', scale)
+            .attr('height', 80)
+            .attr('bgcolor', (d, i) => { 
+                return colors[i];
+            });
 
+        // 5.增加辅助信息
+        // 添加坐标轴，d3.axisBottom 创建一个底部的坐标，通过tickValues 给坐标轴传要显示的刻度值，这里我们显示 100、200、300 三个刻度
+        // 用 scale 函数将这些数值线性映射到 500 像素区间，值从 100 到 309。
+        const axis = d3.axisBottom(scale).tickValues([100, 200, 300]);//返回的axis也是个函数，用来生成坐标轴，通过svg生成坐标轴
+        // 通过SpriteSvg生成svg图形
+        const axisNode = new SpriteSvg({  
+            // x、y指定坐标范围
+            x: 170,  
+            y: 680,
+        });
 
+        // 选中svg，设置svg属性和创建 svg 元素操作
+        d3.select(axisNode.svg)
+        .attr('width', 600)
+        .attr('height', 60)
+        .append('g')
+        .attr('transform', 'translate(30, 0)')
+        .call(axis);
+        axisNode.svg.children[0].setAttribute('font-size', 20);
 
-
+        // 6.将axisNode添加到fglayer上
+        fglayer.append(axisNode);
 
     </script>
 
