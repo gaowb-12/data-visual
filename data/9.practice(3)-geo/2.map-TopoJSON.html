@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1.实战（三）：实现地理信息的可视化-疫情地图的实现</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <p>要使用世界地图的可视化，来呈现不同国家和地区，从 2020 年 1 月 22 日到 3 月 19 日这些天的新冠肺炎疫情进展。
+        主要有四个步骤，分别是准备数据、绘制地图、整合数据和更新绘制方法。</p>
+    <p>地理数据通常可以从开源社区中获取公开数据，或者从相应国家的测绘部门获取当地的公开数据。这次用到的世界地图的数据，我们是通过开源社区获得的。
+        一般来说，地图的 JSON 文件有两种数据格式，一种是 GeoJSON，另一种是 TopoJSON。其中 GeoJSON 是基础格式，它包含了描述地图地理信息的坐标数据。</p>
+
+    <canvas width="1024" height="512"></canvas>
+    <!-- 解压topojson的工具 -->
+    <script src="https://lib.baomitu.com/topojson/3.0.2/topojson.min.js"></script>
+
+    <script type="module">
+
+        // 1.准备数据
+        // 新冠肺炎的数据（WHO网站每天都更新），整理成json，有了新冠肺炎的数据，就可以和世界地图上的国家一一对应。
+        './covid-data.json'
+        // 接下来准备世界地图的地理数据，地理数据两种格式：一种是GeoJson，这是基础格式，另一种是TopoJson。
+        './world-geojson.json'
+
+        // 2.绘制地图（墨卡托投影的方式绘制地图）
+        // 墨卡托投影：实现思路就是先把地球的南北极往外扩，先变成一个圆柱体，在将世界地图看作是贴在圆柱侧面的曲面，经纬度作为x、y坐标，最后把圆柱侧面展开
+        // 我们将 GeoJSON 数据中，coordinates 属性里的经纬度信息转换成画布坐标
+        const width = 1024;//将geojson数据用墨卡托投影方式投影到1024*512宽高的canvas上
+        const height = 512;
+        function projection([longitude, latitude]){
+            const x = width * (longitude + 180) / 360;// 经度转换为x坐标
+            const y = height * (1 - (latitude + 90) / 180);// Canvas坐标系y轴朝下，所以需要翻转一下
+            return [x, y];
+        }
+        
+        // 画点
+        function drawPoints(ctx, points) {
+            ctx.beginPath();
+            ctx.moveTo(...points[0]);
+            for(let i = 1; i < points.length; i++) {
+                ctx.lineTo(...points[i]);
+            }
+            ctx.fill();
+        }
+
+        // 绘制地图
+        function drawMap(ctx, countries){
+            const features = countries.features;
+            features.forEach(({geometry}) => {
+                if(geometry.type === 'MultiPolygon') {
+                    const coordinates = geometry.coordinates;
+                    // 绘制区域
+                    if(coordinates) {
+                        coordinates.forEach((contours) => {
+                            contours.forEach((path) => {
+                                const points = path.map(projection);
+                                drawPoints(ctx, points);
+                            });
+                        });
+                    }
+                } else if(geometry.type === 'Polygon') {
+                    // 绘制轮廓
+                    const contours = geometry.coordinates;
+                    contours.forEach((path) => {
+                        const points = path.map(projection);
+                        drawPoints(ctx, points);
+                    });
+                }
+            });
+        }
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = 'green';
+
+        (async function () {
+            // 加载TopoJSON压缩的地图数据
+            const worldData = await (await fetch('./assets/world-topojson.json')).json();
+            // 对地图数据通过topojson工具进行解压
+            const countries = topojson.feature(worldData, worldData.objects.countries);
+            drawMap(ctx, countries);
+        })();
+
+    </script>
+
+</body>
+</html>
