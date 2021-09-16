@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1.实战（三）：实现地理信息的可视化-疫情地图的实现</title>
+    <title>1.实战（三）：实现地理信息的可视化-疫情地图的实现-将数据与地图结合</title>
     <style>
         canvas{
             border: 1px solid #ccc;
@@ -51,9 +51,17 @@
         }
 
         // 绘制地图
-        function drawMap(ctx, countries){
+        function drawMap(ctx, countries, date){
+            ctx.fillStyle = "#3ac";
             const features = countries.features;
-            features.forEach(({geometry}) => {
+            features.forEach(({ geometry, properties }) => {
+                const covid = properties.covid ? properties.covid[date] : null;
+                if (covid) {
+                    const confirmed = covid.confirmed;
+                    if (confirmed) {
+                        ctx.fillStyle = mapColor(confirmed);
+                    }
+                }
                 if(geometry.type === 'MultiPolygon') {
                     const coordinates = geometry.coordinates;
                     // 绘制区域
@@ -76,16 +84,61 @@
             });
         }
 
+        // 把无人感染到感染人数超过 10000 人划分了 7 个等级，每个等级用不同的颜色表示：
+        function mapColor(confirmed) {
+            if(confirmed < 10) {
+                return 'rgb(250, 247, 171)';
+            }
+            if(confirmed < 100) {
+                return 'rgb(255, 186, 66)';
+            }
+            if(confirmed < 500) {
+                return 'rgb(234, 110, 41)';
+            }
+            if(confirmed < 1000) {
+                return 'rgb(224, 81, 57)';
+            }
+            if(confirmed < 10000) {
+                return 'rgb(192, 50, 39)';
+            }
+            return 'rgb(151, 32, 19)';
+        }
+
+        // 将对应的国家的疫情数据，添加到地图的properties中的convid属性上
+        function mapDataToCountries(geoData, convidData) {
+            const convidDataMap = {};
+            convidData.dailyReports.forEach((d) => {
+                const date = d.updatedDate;
+                const countries = d.countries;
+                countries.forEach((country) => {
+                    const name = country.country;
+                    convidDataMap[name] = convidDataMap[name] || {};
+                    convidDataMap[name][date] = country;
+                });
+            });
+            geoData.features.forEach((d) => {
+                const name = d.properties.name;
+                d.properties.covid = convidDataMap[name];
+            });
+        }
+
         const canvas = document.querySelector("canvas");
         const ctx = canvas.getContext("2d");
-        ctx.fillStyle = 'green';
 
         (async function () {
             // 加载TopoJSON压缩的地图数据
             const worldData = await (await fetch('./assets/world-topojson.json')).json();
             // 对地图数据通过topojson工具进行解压
             const countries = topojson.feature(worldData, worldData.objects.countries);
-            drawMap(ctx, countries);
+            
+            // 3.整合数据
+            const covidData = await (await fetch('./assets/covid-data.json')).json();
+
+            mapDataToCountries(countries, covidData);
+
+            // 4.将数据与地图结合
+            drawMap(ctx, countries, "2020-01-22");
+
         })();
 
     </script>
