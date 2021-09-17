@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1.实战（三）：实现3D地球可视化（上）-实现一个 3D 地球</title>
+    <style>
+        #container{
+            border:1px solid #ccc;
+            width:512px;
+            height:512px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <script src="http://unpkg.com/spritejs/dist/spritejs.js"></script>
+    <!-- spritejs的3d扩展可以实现3d图形 -->
+    <script src="http://unpkg.com/sprite-extend-3d/dist/sprite-extend-3d.js"></script>
+
+    <script type="module">
+        // spritejs的3d扩展可以实现3d图形的一般方法
+        // 1.加载js
+
+        // 2.创建场景，添加layer对象
+        const { Scene } = spritejs;
+        const container = document.getElementById("container");
+        const scene = new Scene({
+            container
+        });
+        // 与 2D 的 Layer 不同，SpriteJS 的 3D 扩展创建的 Layer 需要设置相机
+        const layer = scene.layer3d("fglayer",{
+            alpha: false,
+            // 初始化透视相机的视角与位置
+            camera: { 
+                fov: 35, 
+                pos: [0, 0, 5], 
+            },
+        });
+
+        // 2.创建webgl program
+        // SpriteJS 的 3D 扩展内置了一些常用的 Shader。以及一些几何体，这里用的是Sphere球体
+        const { Sphere, shaders } = spritejs.ext3d;
+        const program = layer.createProgram({
+            ...shaders.GEOMETRY, // 符合Phong 反射模型的几何体 Shader
+            cullface:null
+        });
+
+        // 3.创建球体
+        const globe = new Sphere(program, {
+            colors: '#ccc',  //颜色
+            widthSegments: 64,  //设置宽度
+            heightSegments: 32,  //设置高度
+            radius: 1, //半径
+        });
+
+        // 渲染球体
+        layer.append(globe);
+    </script>
+</body>
+</html>
