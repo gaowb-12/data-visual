@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3.实战（四）：实现3D地球可视化（上）-实现星空背景</title>
+    <title>2.实战（五）：实现3D地球可视化（下）-高亮国家地区的方法</title>
     <style>
         #container{
             border:1px solid #ccc;
@@ -94,6 +94,8 @@
             context.fill();
             context.stroke();
             context.restore();
+
+            coordinate(countries)
             return context.canvas;
         }
 
@@ -208,6 +210,7 @@
         `
 
         const texture = layer.createTexture({});
+        let imgCache = null;
         loadMap("./world-topojson.json")
         .then((map) => { 
             texture.image = map; 
@@ -222,6 +225,7 @@
         });
         
         // 实现星空背景
+        let skyBox = null;
         function createSky(layer, skyProgram) {
             skyProgram = skyProgram || layer.createProgram({
                 vertex: skyVertex,
@@ -229,7 +233,7 @@
                 transparent: true,
                 cullFace: null,
             });
-            const skyBox = new Sphere(skyProgram);
+            skyBox = new Sphere(skyProgram);
             skyBox.attributes.scale = 100;
             layer.append(skyBox);
             return skyBox;
@@ -248,8 +252,94 @@
         // 渲染球体
         layer.append(globe);
 
+        // 7.坐标转换，鼠标交互
+        function coordinate(countries){
+            layer.setRaycast();
+        
+            // 鼠标在地球上移动的时候，通过 SpriteJS，我们拿到三维的球面坐标
+            globe.addEventListener('mousemove', (e) => {
+                const [lng, lat] = positionToLatlng(...e.hit.localPoint);
+                const country = getCountryInfo(lat, lng, countries);
+                if(country.properties) {
+                    console.log(country.properties.name);
+                    highlightMap(texture, country, countries)
+                }
+            });
+            // 将天空包围盒的 raycast 设置成了 none
+            skyBox.attributes.raycast = 'none';
+
+            
+            /**
+             * 将球面坐标转换为平面地图坐标
+             * @param {*} x
+             * @param {*} y
+             * @param {*} z
+             * @param {*} radius
+             */
+            function unproject(x, y, z, radius = 1) {
+                const pLength = Math.PI * 2;
+                const tLength = Math.PI;
+                const v = Math.acos(y / radius) / tLength; // const y = radius * Math.cos(v * tLength);
+                let u = Math.atan2(-z, x) + Math.PI; // z / x = -1 * Math.tan(u * pLength);
+                u /= pLength;
+                return [u * mapScale * mapWidth, v * mapScale * mapHeight];
+            }
+
+            // 通过等角方位投影的反函数，将平面直角坐标转换为经纬度
+            function positionToLatlng(x, y, z, radius = 1) {
+                const [u, v] = unproject(x, y, z, radius);
+                return projection.invert([u, v]);
+            }
+
+            // 通过经纬度拿到国家信息
+            function getCountryInfo(latitude, longitude, countries) {
+                if(!countries) return {index: -1};
+                let idx = -1;
+                countries.features.some((d, i) => {
+                    const ret = d3.geoContains(d, [longitude, latitude]);
+                    if(ret) idx = i;
+                    return ret;
+                });
+                const info = idx >= 0 ? {...countries.features[idx]} : {};
+                info.index = idx;
+                return info;
+            }
+        }
+
+        // 8.高亮国家地区
+        function highlightMap(texture, info, countries) {
+            if(texture.index === info.index) return;
+            const canvas = texture.image;
+            if(!canvas) return;
+
+            const idx = info.index;
+            const highlightMapContxt = canvas.getContext('2d');
+
+            if(!imgCache) {
+                imgCache = new OffscreenCanvas(canvas.width, canvas.height);
+                imgCache.getContext('2d').drawImage(canvas, 0, 0);
+            }
+            highlightMapContxt.clearRect(0, 0, mapScale * mapWidth, mapScale * mapHeight);
+            highlightMapContxt.drawImage(imgCache, 0, 0);
+
+            if(idx > 0) {
+                const path = d3.geoPath(projection).context(highlightMapContxt);
+                highlightMapContxt.save();
+                highlightMapContxt.fillStyle = '#fff';
+                highlightMapContxt.beginPath();
+                // 只绘制高亮区域
+                path({type: 'FeatureCollection', features: countries.features.slice(idx, idx + 1)});
+                highlightMapContxt.fill();
+                highlightMapContxt.restore();
+            }
+            texture.index = idx;
+            texture.needsUpdate = true;
+            layer.forceUpdate();
+        }
+
+
         // 开启旋转控制
-        layer.setOrbit({autoRotate: true}); 
+        layer.setOrbit({autoRotate: false}); 
     </script>
 </body>
 </html>
