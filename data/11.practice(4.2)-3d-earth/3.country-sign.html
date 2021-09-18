@@ -50,7 +50,7 @@
 
         // 2.创建webgl program
         // SpriteJS 的 3D 扩展内置了一些常用的 Shader。以及一些几何体，这里用的是Sphere球体
-        const { Sphere } = spritejs.ext3d;
+        const { Sphere, Cylindar } = spritejs.ext3d;
 
         // 4.创建投影
         // 先绘制一张平面地图，然后通过纹理的方式添加到地球上，作为纹理的球面地图需要用等角方位投影（d3-geo模块支持）
@@ -335,6 +335,132 @@
             texture.index = idx;
             texture.needsUpdate = true;
             layer.forceUpdate();
+        }
+
+        // 9.计算几何体摆放位置
+        // target表示需要放置的物体
+        function setGlobeTarget(globe, target, {latitude, longitude, transpose = false, ...attrs}) {
+            // 球体的半径
+            const radius = globe.attributes.radius;
+            if(transpose) target.transpose();
+            if(latitude != null && longitude != null) {
+                const scale = target.attributes.scaleY * (attrs.scale || 1.0);
+                const height = target.attributes.height;
+                // 先用 projection 函数将经纬度映射为地图上的直角坐标，然后用直角坐标转球面坐标的公式
+                const pos = latlngToPosition(latitude, longitude, radius);
+                // 要将底部放置在地面上（根据缩放计算新的坐标位置）
+                pos.scale(height * 0.5 * scale / radius + 1);
+                attrs.pos = pos;
+            }
+            target.attr(attrs);
+            const sp = new Vec3().copy(attrs.pos).scale(2);
+            // 通过lootAt函数，让物体朝向球面的法向量方向（lookAt 函数是让物体的 z 轴朝向向量方向）
+            target.lookAt(sp);
+            globe.append(target);
+        }
+
+        /**
+         * 将经纬度转换为球面坐标
+         * @param {*} latitude
+         * @param {*} longitude
+         * @param {*} radius
+         */
+        function latlngToPosition(latitude, longitude, radius = 1) {
+            const [u, v] = projection([longitude, latitude]);
+            return project(u, v, radius);
+        }
+
+        /**
+         * 将平面地图坐标转换为球面坐标
+         * @param {*} u
+         * @param {*} v
+         * @param {*} radius
+         */
+        function project(u, v, radius = 1) {
+            u /= mapScale * mapWidth;
+            v /= mapScale * mapHeight;
+            const pLength = Math.PI * 2;
+            const tLength = Math.PI;
+            const x = -radius * Math.cos(u * pLength) * Math.sin(v * tLength);
+            const y = radius * Math.cos(v * tLength);
+            const z = radius * Math.sin(u * pLength) * Math.sin(v * tLength);
+            return new Vec3(x, y, z);
+        }
+
+        // 10.摆放光柱
+        const beamVertx = `
+            precision highp float;
+            precision highp int;
+
+            attribute vec3 position;
+            attribute vec3 normal;
+            attribute vec4 color;
+
+            uniform mat4 modelViewMatrix;
+            uniform mat4 projectionMatrix;
+            uniform mat3 normalMatrix;
+
+            varying vec3 vNormal;
+            varying vec4 vColor;
+
+            uniform vec4 ambientColor; // 环境光
+            uniform float uHeight;
+
+            void main() {
+                vNormal = normalize(normalMatrix * normal);
+                vec3 ambient = ambientColor.rgb * color.rgb;// 计算环境光反射颜色
+                float height = 0.5 - position.z / uHeight;
+                vColor = vec4(ambient + 0.3 * sin(height), color.a * height);
+                vec3 P = position;
+                P.xy *= 2.0 - pow(height, 3.0);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(P, 1.0);
+            }
+        `;
+        const beamFrag = `
+            precision highp float;
+            precision highp int;
+
+            varying vec3 vNormal;
+            varying vec4 vColor;
+
+            void main() {
+                gl_FragColor = vColor;
+            }
+        `
+        
+        function addBeam(globe, {
+            latitude,
+            longitude,
+            width = 1.0,
+            height = 25.0,
+            color = 'rgba(245,250,113, 0.5)',
+            raycast = 'none',
+            segments = 60
+        } = {}
+        ) {
+            const layer = globe.layer;
+            const radius = globe.attributes.radius;
+            if(layer) {
+                const r = width / 2;
+                const scale = radius * 0.015;
+                const program = layer.createProgram({
+                    transparent: true,
+                    vertex: beamVertx,
+                    fragment: beamFrag,
+                    uniforms: {
+                        uHeight: {value: height},
+                    },
+                });
+                const beam = new Cylinder(program, {
+                    radiusTop: r,
+                    radiusBottom: r,
+                    radialSegments: segments,
+                    height,
+                    colors: color,
+                });
+                setGlobeTarget(globe, beam, {transpose: true, latitude, longitude, scale, raycast});
+                return beam;
+            }
         }
 
 
