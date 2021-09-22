@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小试牛刀</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Vector2D } from "/review/common/Vector2D.js";
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.translate(0, canvas.height);
+        ctx.scale(1, -1);
+        
+
+        function drawLine(ctx,v0,...v){
+            ctx.beginPath();
+            ctx.moveTo(...v0);
+            for (let i = 0; i < v.length; i++) {
+                ctx.lineTo(...v[i]);
+            }
+            ctx.stroke();
+        }
+
+        // 1.判断两个线段的位置关系
+        // const line1 = new Vector2D(101,126).normalize();
+        // const line2 = new Vector2D(51,16).normalize();
+        // // 判断两个线段的关系
+        // let r1 = line1.dot(line2);
+        // if(r1 == 0) {
+        //     "垂直"
+        // }else if(r1 == 1) {
+        //     "平行"
+        // }else{
+        //     "其他"
+        // }
+
+        // 2.求点到线段的距离
+        // 线段[(x0,y0),(x1,y1)]   点(x2,y2)
+        // const line1 = new Vector2D(101,126).normalize();//表示线段的向量
+        // const line2 = new Vector2D(51,16).normalize();//坐标点的向量
+        // Math.abs(line2.cross(line1));
+
+        // 3.判断点是否处于扫描范围内
+        // 视角60度 = π/3
+        const line1 = new Vector2D(600,0).rotate(0.3); //初始
+        const line2 = line1.copy().rotate(Math.PI / 4); 
+        const randomDot = new Vector2D(Math.random() * 50, Math.random() * 60).scale(5);
+        drawLine(ctx,line1,new Vector2D(0,0),line2);//视角范围
+        drawLine(ctx,randomDot,new Vector2D(0,0));//随机的点
+
+        // 通过点坐标向量与两个边分别叉乘
+        const z1 = randomDot.cross(line1);
+        const z2 = randomDot.cross(line2);
+        console.log(z1,z2);
+        if(Math.sign(z1) == Math.sign(z2)){
+            console.log("外部")
+        }else{
+            console.log("内部")
+        }
+        
+    </script>
+</body>
+</html>
