@@ -23,30 +23,23 @@
         ctx.scale(1, -1);
 
         /**
-         * 向量绘制多边形
-         * ctx
-         * v0起始向量
-         * sideW边长
-         * 多边形的边数
+         * 生成坐标集合的抽象高阶函数
+         * xFun：x的参数方程
+         * yFun：y的参数方程
          * */
-        function regularShape(ctx, v0, sideW, edge){
-            let v = new Vector2D(1, 0).scale(sideW);
-            // 根据三角形内角和公式计算每次旋转角度的大小
-            const dir = 2 * Math.PI / edge;
+        function parametric(xFun, yFun){
+            /**
+             * x起始点x坐标
+             * y起始点y坐标
+             * segments将几何图形分成的份数
+            */
+            return function(x, y, segments=60){
 
-            ctx.lineWidth = 2;
-            ctx.moveTo(...v0);
-            for (let i = 0; i < edge; i++) {
-                let v1 = v.copy().rotate(dir * i);
-                ctx.lineTo(...v0.add(v1));
             }
-            ctx.stroke();
         }
 
-        regularShape(ctx, new Vector2D(-50,-50), 20, 3);
-        regularShape(ctx, new Vector2D(-50,50), 20, 5);
-        regularShape(ctx, new Vector2D(50,50), 20, 7);
-        regularShape(ctx, new Vector2D(50,-50), 20, 9);
+        
+
 
     </script>
 </body>
