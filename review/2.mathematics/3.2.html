@@ -22,23 +22,84 @@
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.scale(1, -1);
 
+        function draw(points,ctx){
+            ctx.lineWidth=1;
+            ctx.beginPath();
+            ctx.moveTo(...points[0]);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(...points[i]);
+            }
+            ctx.stroke();
+        }
+
         /**
          * 生成坐标集合的抽象高阶函数
          * xFun：x的参数方程
          * yFun：y的参数方程
+         * transFun：坐标转换
          * */
-        function parametric(xFun, yFun){
+        function parametric(xFun, yFun, transFun){
             /**
              * x起始点x坐标
              * y起始点y坐标
              * segments将几何图形分成的份数
             */
-            return function(x, y, segments=60){
+            return function(start = 0, end = 2 * Math.PI, segments = 60, ...args){
+                let points = [];// 坐标点集合
+                // 需要绘制的范围
+                const bran = end - start;
+                // 使用segments将范围划分为等分的份数
+                const v = bran / segments;
+                for (let i = 0; i <= segments; i++) {
+                    let t = start + i * v;
+                    const x = xFun(t, ...args);
+                    const y = yFun(t, ...args);
+                    if(transFun){
+                        points.push(transFun([x,y]));
+                    }else{
+                        points.push([x,y]);
+                    }
+                }
 
+                return {
+                    points,
+                    draw:draw.bind(null,points)
+                }
             }
         }
 
-        
+        // 圆
+        // let param = parametric(
+        //     (t) => 50 * Math.cos(t),
+        //     (t) => 50 * Math.sin(t)
+        // )
+        // param(0, 2 * Math.PI).draw(ctx);
+
+        // 抛物线
+        // let param = parametric(
+        //     (t) => 25 * t,
+        //     (t) => 25 * t ** 2
+        // )
+        // param(-5.5, 5.5).draw(ctx);
+
+        // 二阶贝塞尔曲线
+        let param = parametric(
+            (t, [{x:p0}, {x:p1}, {x:p2}]) => (1 - t) ** 2 * p0 + 2 * (1 - t) * t * p1 + t ** 2 * p2,
+            (t, [{y:p0}, {y:p1}, {y:p2}]) => (1 - t) ** 2 * p0 + 2 * (1 - t) * t * p1 + t ** 2 * p2
+        )
+
+        const p0 = new Vector2D(0,0);
+        const p1 = new Vector2D(100,0).rotate(0.75);
+        const p2 = new Vector2D(200,0);
+
+        // 绘制30条绕圆心的曲线
+        const count = 30;
+        for (let i = 0; i < count; i++) {
+            p1.rotate(2 * Math.PI / count);
+            p2.rotate(2 * Math.PI / count);
+            param(0, 1, 60, [p0, p1, p2]).draw(ctx);
+        }
+
 
 
     </script>
