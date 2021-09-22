@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>参数方程描绘曲线</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Vector2D } from "/review/common/Vector2D.js";
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(1, -1);
+
+        /**
+         * 向量绘制多边形
+         * ctx
+         * v0起始向量
+         * sideW边长
+         * 多边形的边数
+         * */
+        function regularShape(ctx, v0, sideW, edge){
+            let v = new Vector2D(1, 0).scale(sideW);
+            // 根据三角形内角和公式计算每次旋转角度的大小
+            const dir = 2 * Math.PI / edge;
+
+            ctx.lineWidth = 2;
+            ctx.moveTo(...v0);
+            for (let i = 0; i < edge; i++) {
+                let v1 = v.copy().rotate(dir * i);
+                ctx.lineTo(...v0.add(v1));
+            }
+            ctx.stroke();
+        }
+
+        regularShape(ctx, new Vector2D(-50,-50), 20, 3);
+        regularShape(ctx, new Vector2D(-50,50), 20, 5);
+        regularShape(ctx, new Vector2D(50,50), 20, 7);
+        regularShape(ctx, new Vector2D(50,-50), 20, 9);
+
+    </script>
+</body>
+</html>
