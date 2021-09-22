@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        canvas{
+            width:512px;
+            height:512px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script>
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        console.log(canvas.width)
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(1,-1);
+
+        ctx.strokeStyle = "green";
+        ctx.beginPath();
+        ctx.arc(0,0,100,0, 2 * Math.PI);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-180,-150);
+        ctx.lineTo(-80,-50);
+        ctx.lineTo(20,-150);
+        ctx.stroke()
+
+    </script>
+</body>
+</html>
