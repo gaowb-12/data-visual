@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向量树</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Vector2D } from "/review/common/Vector2D.js";
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.translate(0, canvas.height);
+        ctx.scale(1, -1);
+        ctx.lineCap = 'round';// 定义线条末端线帽的样式
+
+        /**
+         * 绘制向量树
+         * @param {object} options
+         * options = {
+         *  v：起始点
+         *  length：树枝长度
+         *  width：树枝粗细程度
+         *  radius：向量的偏转角度
+         * }
+         * 
+         * */
+
+        function draw({ctx, v0,length,width,radius,bias}){
+            // 1.初始生成一个向量
+            const v = new Vector2D(1,0).rotate(radius).scale(length);
+            // 初始向量加法运算，生成新的向量
+            const v1 = v0.copy().add(v);
+
+            // 绘制
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(...v0);
+            ctx.lineTo(...v1);
+            ctx.stroke();
+            
+            if(width > 2){
+                // 分叉处理
+                // 随机角度设置
+                const right = Math.PI / 4 + 0.5 * (radius - 0.2) + bias * (Math.random() - 0.5);
+                const left = Math.PI / 4 + 0.5 * (radius + 0.2) + bias * (Math.random() - 0.5);
+                // 右侧分叉
+                draw({
+                    ctx,
+                    v0:v1,
+                    length:length * 0.9,
+                    width:width * 0.8,
+                    radius:right,
+                    bias:bias*0.9
+                });
+                // 左侧分叉
+                draw({
+                    ctx,
+                    v0:v1,
+                    length:length * 0.9,
+                    width:width * 0.8,
+                    radius:left,
+                    bias:bias*0.9
+                });
+            }
+        }
+
+        const v0 = new Vector2D(256,0);
+        
+        draw({
+            ctx,
+            v0,
+            length:50,
+            width:10,
+            radius:1.5,
+            bias:3
+        });
+
+    </script>
+</body>
+</html>
