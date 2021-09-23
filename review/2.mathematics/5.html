@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仿射变换-webgl</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Vector2D } from "/review/common/Vector2D.js";
+        // 导入进行三角剖分的库
+        import { earcut } from '/common/lib/earcut.js';
+
+        /**
+         * webgl原生五步用法
+         * 1.创建webgl上下文
+         * 2.创建webgl程序
+         * 3.将数据存入缓冲区
+         * 4.将数据读取到gpu
+         * 5.gpu执行webgl程序
+        */
+        // 1.
+        const canvas = document.querySelector("canvas");
+        const gl = canvas.getContext("webgl");
+
+        // 2.
+        const vertex = `
+            attribute vec2 position;
+            void main(){
+                gl_PointSize = 1.0;
+                gl_Position = vec4(position, 0.0, 1.0);
+            }
+        `
+        const fragment = `
+            precision mediump float;
+            uniform vec2 color;
+            void main(){
+                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            }
+        `
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader,vertex);
+        gl.compileShader(vertexShader);
+
+        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader,fragment);
+        gl.compileShader(fragmentShader);
+
+        const program = gl.createProgram();
+        gl.attachShader(program,vertexShader);
+        gl.attachShader(program,fragmentShader);
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        // 3.
+        // 不规则多边形的顶点数组
+        const vertices = [
+            [-1, -1],
+            [0, 1],
+            [1, -1],
+        ];
+        // const earcutVertices = earcut(vertices.flat(), null, 2);
+
+        const points = new Float32Array(vertices.flat());
+        // const cells = new Uint16Array(earcutVertices);
+        
+        const pointBufferId = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, pointBufferId);
+        gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+
+        // 4.从刚刚当前设置的缓冲区对象获取数据，设置顶点着色器
+        const vPosition = gl.getAttribLocation(program, "position");
+        gl.vertexAttribPointer(vPosition, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vPosition);
+
+        // 设置三角剖分的缓存数据
+        // const cellBufferId = gl.createBuffer();
+        // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,cellBufferId);
+        // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,cells, gl.STATIC_DRAW);
+
+        // 5.
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLES, 0, points.length / 2);
+
+        /**
+         * 生成随机三角形的属性
+         * */ 
+        function triangles(){
+
+        }
+        function update(){
+
+        }
+
+    </script>
+</body>
+</html>
