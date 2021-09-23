@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多边形填充-canvas2d-点在多边形内部</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Vector2D } from "/review/common/Vector2D.js";
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(1, -1);
+       
+        function draw(ctx,points,{
+            fillStyle = "red",
+            close=false,
+            rule="nonzero"
+        }={}){
+            ctx.beginPath();
+            ctx.moveTo(...points[0]);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(...points[i]);
+            }
+            if(close) ctx.closePath();
+            ctx.fillStyle = fillStyle;
+            ctx.fill(rule);
+            ctx.stroke();
+        }
+
+        // 1.绘制多边形
+
+        const polygon = [
+            [-0.7, 0.5],
+            [-0.4, 0.3],
+            [-0.25, 0.71],
+            [-0.1, 0.56],
+            [-0.1, 0.13],
+            [0.4, 0.21],
+            [0, -0.6],
+            [-0.3, -0.3],
+            [-0.6, -0.3],
+            [-0.45, 0.0],
+        ];
+        polygon.forEach(item=>{
+            item[0] *= 256
+            item[1] *= 256
+        });
+        draw(ctx, polygon, {
+            fillStyle : "red"
+        });
+
+        // 2.构造多边形顶点
+        const points = [[100,100],[100,200],[150,200]];
+        // 五边形
+        const stars = [
+            ...points
+        ];
+        draw(ctx,stars, {
+            fillStyle : "red"
+        });
+
+        const {left, top} = canvas.getBoundingClientRect();
+        canvas.addEventListener("mousemove",(e)=>{
+            const {x, y} = e;
+            let offsetx = x-left;
+            let offsety = y-top;
+            ctx.clearRect(-256, -256, 512, 512);
+
+            if(isPointInPath(ctx, offsetx, offsety)){
+                draw(ctx, polygon, {
+                    fillStyle : "green"
+                });
+                draw(ctx,stars, {
+                    fillStyle : "green"
+                });
+            }else{
+                draw(ctx, polygon, {
+                    fillStyle : "red"
+                });
+                draw(ctx,stars, {
+                    fillStyle : "red"
+                });
+            }
+        });
+
+
+        // 自己实现(克隆一个新的canvas，重新都绘制一遍在判断)
+        function isPointInPath(ctx, x, y){
+            const context =  ctx.canvas.cloneNode().getContext("2d");
+            context.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
+            context.scale(1, -1);
+            context.clearRect(-256, -256, 512, 512);
+            draw(context, polygon);
+            if(context.isPointInPath(x,y)){
+                return true;
+            }else{
+                context.clearRect(-256, -256, 512, 512);
+                draw(context, stars);
+                if(context.isPointInPath(x,y)){
+                    return true;
+                }
+            }
+            return false;
+        }
+
+    </script>
+</body>
+</html>
