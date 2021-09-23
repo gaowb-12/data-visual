@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多边形填充-canvas2d</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Vector2D } from "/review/common/Vector2D.js";
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(1, -1);
+       
+        function draw(ctx,points,{
+            fillStyle = "black",
+            close=false,
+            rule="nonzero"
+        }={}){
+            ctx.beginPath();
+            ctx.moveTo(...points[0]);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(...points[i]);
+            }
+            if(close) ctx.closePath();
+            ctx.fillStyle = fillStyle;
+            ctx.fill(rule);
+            ctx.stroke();
+        }
+
+        // 1.构造多边形顶点
+        const points = [new Vector2D(0,100)];
+        for (let i = 0; i <= 4; i++) {
+            const p = points[0].copy().rotate(i * Math.PI * 0.4);
+            points.push(p);
+        }
+
+        // 2.绘制多边形
+
+        // 五边形
+        const polygon = [
+            ...points
+        ];
+        ctx.save();
+        ctx.translate(-128,0);
+        draw(ctx,polygon);
+        ctx.restore();
+
+        // 五角星
+        const stars = [
+            points[5],
+            points[2],
+            points[4],
+            points[1],
+            points[3]
+        ];
+        ctx.save();
+        ctx.translate(128,0);
+        draw(ctx,stars);
+        ctx.restore();
+
+    </script>
+</body>
+</html>

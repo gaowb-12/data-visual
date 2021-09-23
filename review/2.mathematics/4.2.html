@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多边形填充-webgl</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Vector2D } from "/review/common/Vector2D.js";
+        // 不规则多边形的顶点数组
+        const vertices = [
+            [-0.7, 0.5],
+            [-0.4, 0.3],
+            [-0.25, 0.71],
+            [-0.1, 0.56],
+            [-0.1, 0.13],
+            [0.4, 0.21],
+            [0, -0.6],
+            [-0.3, -0.3],
+            [-0.6, -0.3],
+            [-0.45, 0.0],
+        ];
+    </script>
+</body>
+</html>
