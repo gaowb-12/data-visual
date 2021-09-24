@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仿射变换-webgl-小试牛刀</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Vector2D } from "/review/common/Vector2D.js";
+        // 导入进行三角剖分的库
+        import { earcut } from '/common/lib/earcut.js';
+
+        /**
+         * webgl原生五步用法
+         * 1.创建webgl上下文
+         * 2.创建webgl程序
+         * 3.将数据存入缓冲区
+         * 4.将数据读取到gpu
+         * 5.gpu执行webgl程序
+        */
+        // 1.
+        const canvas = document.querySelector("canvas");
+        const gl = canvas.getContext("webgl");
+
+        // 2.
+        const vertex = `
+            attribute vec2 position;
+
+            uniform float u_total;
+            uniform float u_scale;
+            uniform float u_time;
+            uniform vec4 u_color;
+            uniform vec2 u_dir;
+            uniform float u_rotate;
+
+            varying vec4 color;
+
+            void main(){
+                gl_PointSize = 1.0;
+
+                float p = min(1.0, u_time / u_total);
+                float rad = u_rotate + 10.0 * 3.14 * p;
+                float scale = u_scale * p * (2.0 - p);
+                vec2 translate = u_dir * p;
+
+                mat3 skewMatrix = mat3(
+                    1, tan(translate.x), 0,
+                    tan(translate.y), 1, 0,
+                    0, 0, 1
+                );
+                mat3 translateMatrix = mat3(
+                    1, 0, 0,
+                    0, 1, 0,
+                    translate.x, translate.y, 1
+                );
+                mat3 rotateMatrix = mat3(
+                    cos(rad), sin(rad), 0,
+                    -sin(rad), cos(rad), 0,
+                    0, 0, 1
+                );
+                mat3 scaleMatrix = mat3(
+                    scale, 0, 0,
+                    0, scale, 0,
+                    0, 0, 1
+                );
+                vec3 pos = translateMatrix  * scaleMatrix * skewMatrix * vec3(position, 1.0);
+
+                color = u_color;
+                color.a = 1.0 - p;
+
+                gl_Position = vec4(pos, 1.0);
+            }
+        `
+        const fragment = `
+            precision mediump float;
+
+            uniform vec4 u_color;
+            varying vec4 color;
+
+            void main(){
+                gl_FragColor = color;
+            }
+        `
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader,vertex);
+        gl.compileShader(vertexShader);
+
+        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader,fragment);
+        gl.compileShader(fragmentShader);
+
+        const program = gl.createProgram();
+        gl.attachShader(program,vertexShader);
+        gl.attachShader(program,fragmentShader);
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        // 3.
+        // 不规则多边形的顶点数组
+        const vertices = [
+            [-1, -1],
+            [0, 1],
+            [1, -1],
+        ];
+        // const earcutVertices = earcut(vertices.flat(), null, 2);
+
+        const points = new Float32Array(vertices.flat());
+        // const cells = new Uint16Array(earcutVertices);
+        
+        const pointBufferId = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, pointBufferId);
+        gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+
+        // 4.从刚刚当前设置的缓冲区对象获取数据，设置顶点着色器
+        const vPosition = gl.getAttribLocation(program, "position");
+        gl.vertexAttribPointer(vPosition, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vPosition);
+
+        // 设置三角剖分的缓存数据
+        // const cellBufferId = gl.createBuffer();
+        // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,cellBufferId);
+        // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,cells, gl.STATIC_DRAW);
+
+        // 5.
+        
+
+        /**
+         * 生成随机三角形的属性
+         * */ 
+        function randomTriangles(){
+            const u_rotate = Math.random() * Math.PI;//初始旋转角度
+            const rad = 2 * Math.random() * Math.PI;
+            const u_dir = [Math.cos(rad), Math.sin(rad)];//运动方向
+            const u_scale = Math.random() * 0.05 + 0.03; // 缩放
+            const u_color = [Math.random(), Math.random(), Math.random(), 1.0];
+            const u_total = 3; // 总时间
+            const u_time = 0; // 进度
+            const startTime = performance.now(); // 开始时间
+
+            return {
+                u_rotate,
+                u_scale,
+                u_time,
+                u_color,
+                u_total,
+                u_dir,
+                startTime
+            }
+        }
+
+        // 设置uniform
+        function setUniforms(gl, {u_rotate,u_time,u_scale,u_color,u_total,u_dir} = {}){
+            let loc = gl.getUniformLocation(program,"u_rotate");
+            gl.uniform1f(loc, u_rotate);
+
+            loc = gl.getUniformLocation(program,"u_time");
+            gl.uniform1f(loc, u_time);
+
+            loc = gl.getUniformLocation(program,"u_scale");
+            gl.uniform1f(loc, u_scale);
+
+            loc = gl.getUniformLocation(program,"u_color");
+            gl.uniform4fv(loc, u_color);
+
+            loc = gl.getUniformLocation(program,"u_total");
+            gl.uniform1f(loc, u_total);
+
+            loc = gl.getUniformLocation(program,"u_dir");
+            gl.uniform2fv(loc, u_dir);
+        };
+
+        // 实现动画
+        let triangles = [];
+        function update(t){
+            // 生成5个随机三角形
+            for (let i = 0; i <= 4; i++) {
+                let tri = randomTriangles();
+                triangles.push(tri);
+            }
+
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            // 更新五个三角形
+            triangles.forEach(item => {
+                item.u_time = (t - item.startTime) / 1000;
+                setUniforms(gl, item);
+                gl.drawArrays(gl.TRIANGLES, 0, points.length / 2);
+            });
+            triangles = triangles.filter(item=>{
+                return item.u_time < item.u_total;
+            });
+
+            console.log(triangles)
+
+            requestAnimationFrame(update);
+        }
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>
