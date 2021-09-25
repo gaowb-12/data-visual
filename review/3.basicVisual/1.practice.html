@@ -40,7 +40,7 @@
 
             void main(){
                 gl_PointSize = 1.0;
-                vUv = uv;
+                vUv = position;
                 gl_Position = vec4(position,1.0, 1.0);
             }
         `
@@ -49,10 +49,39 @@
 
             varying vec2 vUv;
 
+            vec3 rgb2hsv(vec3 c){
+                vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+                vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+                vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+                float d = q.x - min(q.w, q.y);
+                float e = 1.0e-10;
+                return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+            }
+
+            vec3 hsv2rgb(vec3 c){
+                vec3 rgb = clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0), 6.0)-3.0)-1.0, 0.0, 1.0);
+                rgb = rgb * rgb * (3.0 - 2.0 * rgb);
+                return c.z * mix(vec3(1.0), rgb, c.y);
+            }
+
             void main(){
-                float d = distance(vUv, vec2(0.5));
-                d = step(0.2, d);
-                gl_FragColor = vec4(vec3(d), 1.0);
+                // 获取纹理坐标
+                vec2 st = (vUv + 1.0) / 2.0 - vec2(0.5);
+
+                // 计算HSV颜色表示法中的hue值
+                float rad = atan(st.y, st.x);
+
+                // 距离场
+                float d = length(st);
+
+                // 计算亮度或者饱和度
+                float v = d / 0.2;
+                d = 1.0 - smoothstep(0.19, 0.2, d);
+
+                // 计算颜色
+                vec3 color = hsv2rgb(vec3(rad / 6.28 , d * v, d * v));
+                
+                gl_FragColor = vec4(color * d, 1.0);
             }
         `
         const vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -77,16 +106,9 @@
             [1, 1],
             [1, -1],
         ];
-        const uvs = [
-            [0, 0],
-            [0, 1],
-            [1, 0],
-            [1, 1],
-        ];
         const earcutVertices = earcut(vertices.flat(), null, 2);
         
         const points = new Float32Array(vertices.flat());
-        const uvspoints = new Float32Array(uvs.flat());
         const cells = new Uint16Array(earcutVertices);
         
         const pointBufferId = gl.createBuffer();
@@ -98,15 +120,6 @@
         gl.vertexAttribPointer(vPosition, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vPosition);
 
-        // 设置纹理坐标的缓存数据
-        const uvsBufferId = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, uvsBufferId);
-        gl.bufferData(gl.ARRAY_BUFFER, uvspoints, gl.STATIC_DRAW);
-
-        const vUv = gl.getAttribLocation(program, "uv");
-        gl.vertexAttribPointer(vUv, 2, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(vUv);
-
         // 设置三角剖分的缓存数据
         const cellBufferId = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,cellBufferId);
@@ -115,6 +128,10 @@
         // 5.
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawElements(gl.TRIANGLES, cells.length, gl.UNSIGNED_SHORT, 0);
+
+        
+
+
 
     </script>
 </body>
