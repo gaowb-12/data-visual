@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图案生成-分形图案</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        /**
+         * gl-renderer用法
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.设置uniform变量
+         * 4.设置缓冲区数据
+         * 5.渲染
+         * 
+         * */ 
+
+        //  1.
+         const canvas = document.querySelector("canvas");
+         const renderer = new GlRenderer(canvas);
+
+        // 2.
+        const vertex = `
+            attribute vec2 a_vertexPosition;
+            attribute vec2 uv;
+            varying vec2 vUv;
+            
+            void main() {
+                gl_PointSize = 1.0;
+                vUv = uv;
+                gl_Position = vec4(a_vertexPosition, 1, 1);
+            }
+        `;
+        const fragment = `
+            #ifdef GL_ES
+                precision mediump float;
+            #endif
+
+            varying vec2 vUv;
+
+            uniform float scale;
+            uniform float iterations;
+            uniform vec2 center;
+
+            // 分形公式（曼德勃罗特集）
+            vec2 mandelbrot(vec2 st, vec2 z){
+                // mat2(st, -st.y, st.x) 这是复数的矩阵表达
+                return mat2(st, -st.y, st.x) * st + z;
+            }
+            vec3 palette(float t, vec3 c1, vec3 c2, vec3 c3, vec3 c4) {
+                float x = 1.0 / 3.0;
+                if (t < x) return mix(c1, c2, t/x);
+                else if (t < 2.0 * x) return mix(c2, c3, (t - x)/x);
+                else if (t < 3.0 * x) return mix(c3, c4, (t - 2.0*x)/x);
+                return c4;
+            }
+            
+            void main() {
+                vec2 st = vUv;
+                vec2 z = center + 4.0 * (st - vec2(0.5)) / scale;
+                vec2 c = vec2(0.0);
+
+                bool escaped = false;
+                int j;
+                for(int i = 0; i < 65536; i++){
+                    // 达到一定的迭代次数
+                    if(float(i) > iterations) break;
+                    j = i;
+                    c = mandelbrot(c, z);
+                    // 复数的模大于2
+                    if(length(c) > 2.0){
+                        escaped = true;
+                        break;
+                    }
+                }
+                // gl_FragColor.rgb = escaped ? vec3(float(j) / float(iterations)) : vec3(0.0);
+                gl_FragColor.rgb = escaped ? 
+                    max(1.0, log(scale)) * palette(float(j)/ float(iterations), vec3(0.02, 0.02, 0.03), vec3(0.1, 0.2, 0.3), vec3(0.0, 0.3, 0.2), vec3(0.0, 0.5, 0.8))
+                    : vec3(0.0);
+                gl_FragColor.a = 1.0;
+            }
+        `;
+
+        const program = renderer.compileSync(fragment,vertex);
+        renderer.useProgram(program);
+
+        // 3.
+        renderer.uniforms.center = [0.367, 0.303];
+        renderer.uniforms.scale = 1;
+        renderer.uniforms.iterations = 256;
+
+        // 4.
+        renderer.setMeshData([{
+            positions:[
+                [-1, -1],
+                [-1, 1],
+                [1, 1],
+                [1, -1],
+            ],
+            attributes:{
+                uv:[
+                    [0, 0],
+                    [0, 1],
+                    [1, 1],
+                    [1, 0],
+                ]
+            },
+            cells: [[0, 1, 2], [2, 0, 3]],
+        }]);
+
+        // 5.
+        renderer.render();
+
+        let start  = performance.now();
+        function update(t){
+            if(t - start > 500){
+                var factor = Math.max(0.1, Math.log(renderer.uniforms.scale));
+                renderer.uniforms.scale = (renderer.uniforms.scale += factor) % 10000;
+                renderer.uniforms.iterations = factor * 500;
+                start = t;
+            }
+
+            requestAnimationFrame(update);
+        }
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>
