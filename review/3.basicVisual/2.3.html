@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图案生成-迷宫</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="640" height="512"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        /**
+         * gl-renderer用法
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.设置uniform变量
+         * 4.设置缓冲区数据
+         * 5.渲染
+         * */ 
+
+        //  1.
+         const canvas = document.querySelector("canvas");
+         const renderer = new GlRenderer(canvas);
+
+        // 2.
+        const vertex = `
+            attribute vec2 a_vertexPosition;
+            attribute vec2 uv;
+            varying vec2 vUv;
+            
+            void main() {
+                gl_PointSize = 1.0;
+                vUv = uv;
+                gl_Position = vec4(a_vertexPosition, 1, 1);
+            }
+        `;
+        const fragment = `
+            #ifdef GL_ES
+                precision mediump float;
+            #endif
+
+            varying vec2 vUv;
+            uniform vec2 uPosition;
+
+            // 随机数
+            float random(vec2 st){
+                return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+            }
+
+            vec2 migong(vec2 st){
+                float r = random(floor(st));
+
+                if(r < 0.2){
+                    // x轴翻转
+                    return vec2(1.0 - st.x, st.y);
+                }else if(r < 0.5){
+                    // y轴翻转
+                    return vec2(st.x, 1.0 - st.y);
+                }else if(r < 0.8){
+                    // x/y轴翻转
+                    return vec2(1.0) - st;
+                }
+                return st;
+            }
+            
+            void main() {
+                vec2 st = vUv * vec2(30.0);
+                // 方格处理
+                st.y *= uPosition.y / uPosition.x;
+
+                st = migong(st);
+                vec2 f = fract(st);
+
+                float color = smoothstep(f.y - 0.15, f.y, f.x) - smoothstep(f.y, f.y + 0.15, f.x);
+
+                gl_FragColor.rgb = vec3(color);
+                gl_FragColor.a = 1.0;
+            }
+        `;
+
+        const program = renderer.compileSync(fragment, vertex);
+        renderer.useProgram(program);
+
+        // 3.
+        renderer.uniforms.uPosition = [640.0, 512.0];
+
+        // 4.
+        renderer.setMeshData([{
+            positions:[
+                [-1, -1],
+                [-1, 1],
+                [1, 1],
+                [1, -1],
+            ],
+            attributes:{
+                uv:[
+                    [0, 0],
+                    [0, 1],
+                    [1, 1],
+                    [1, 0],
+                ]
+            },
+            cells: [[0, 1, 2], [2, 0, 3]],
+        }]);
+
+        // 5.
+        renderer.render();
+
+    </script>
+</body>
+</html>
