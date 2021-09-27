@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>滤镜函数实现美颜-像素矩阵</title>
+    <title>滤镜函数实现美颜-高斯模糊</title>
     <style>
         canvas{
             border:1px solid #ccc;
@@ -15,7 +15,7 @@
     <canvas width="0" height="0"></canvas>
 
     <script type="module">
-        import { loadImg, getImageData, traverse, grayMatrix,channel } from "/review/common/lib/utils.js"
+        import { loadImg, getImageData, traverse, grayMatrix,channel, gaussianBlur } from "/review/common/lib/utils.js"
         import { transformColor } from "/review/common/lib/color-matrix.js"
 
         const canvas = document.querySelector("canvas");
@@ -33,17 +33,18 @@
             // 获取像素点
             const imageData = getImageData(img);
             // 处理像素点
-            const result = traverse(imageData,({r, g, b, a})=>{
-                // const v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-                // return [v, v, v, a];
-                const result = transformColor([r, g, b, a], 
-                    // grayMatrix(1),
-                    channel(2)
-                );
+            // const result = traverse(imageData,({r, g, b, a})=>{
+            //     // const v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            //     // return [v, v, v, a];
+            //     const result = transformColor([r, g, b, a], 
+            //         // grayMatrix(1),
+            //         channel(2)
+            //     );
                 
-                return result;
-            });
-            ctx.putImageData(result, 0, 0);
+            //     return result;
+            // });
+            gaussianBlur(imageData, 3);
+            ctx.putImageData(imageData, 0, 0);
         })();
 
     </script>

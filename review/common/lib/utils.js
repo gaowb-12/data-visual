@@ -56,3 +56,86 @@ export function grayMatrix(p){
         0, 0, 0, 1,0,
     ]
 }
+// 改变某个通道的颜色
+export function channel(r = 1, g = 1, b = 1){
+    return [
+        r, 0, 0, 0,0,
+        0, g, 0, 0,0,
+        0, 0, b, 0,0,
+        0, 0, 0, 1,0,
+    ]
+}
+
+/**
+ * 生成高斯模糊矩阵
+ * @param {number} radius 模糊半径
+ * */ 
+export function gaussianMatrix(radius, sigma = radius / 3){
+    const a = 1 / (Math.sqrt(2 * Math.PI) * sigma);
+    const b = -1 / 2 * sigma ** 2;
+    let matrix = [], sum = 0;
+
+    // 根据像素点的模糊半径计算模糊矩阵
+    for (let i = -radius; i <= radius; i++) {
+        let g = a * Math.exp(b * i ** 2);
+        matrix.push(g);
+        sum += g;
+    }
+    matrix = matrix.map(item=> item / sum);
+    return { matrix, sum };
+}
+
+/**
+ * 高斯模糊应用，对x、y两个方向分别应用高斯模糊
+ * @param {imageData} imageData 图片剪裁区数据
+ * @param {number} radius 高斯模糊半径
+ * */ 
+ export function gaussianBlur(imageData, radius){
+    const { width, height, data } = imageData;
+    const { matrix, sum } = gaussianMatrix(radius);
+    
+    // x方向
+    for (let x = 0; x < height; x++) {
+        for (let y = 0; y < width; y++) {
+            let r = 0, g = 0, b = 0;
+            // 当前坐标点在data数组中的位置
+            let k = (x * width + y) * 4;
+            // 分配权重
+            for (let i = -radius; i <= radius; i++) {
+                const o = y + i;
+                if(o > 0 && o < width){
+                    const gm = matrix[radius + i]; // 取权重的值
+                    const j = (width * x + o) * 4;
+                    r += gm * data[j];
+                    g += gm * data[j + 1];
+                    b += gm * data[j + 2];
+                }
+            }
+            data[k] = r / sum;
+            data[k + 1] = g / sum;
+            data[k + 2] = b / sum;
+        }
+    }
+    // y方向
+    for (let y = 0; y < width; y++) {
+        for (let x = 0; x < height; x++) {
+            let r = 0, g = 0, b = 0;
+            // 当前坐标点在data数组中的位置
+            let k = (x * width + y) * 4;
+            // 分配权重
+            for (let i = -radius; i <= radius; i++) {
+                const o = x + i;
+                if(o > 0 && o < height){
+                    const gm = matrix[radius + i]; // 取权重的值
+                    const j = (o * width + y) * 4;
+                    r += gm * data[j];
+                    g += gm * data[j + 1];
+                    b += gm * data[j + 2];
+                }
+            }
+            data[k] = r / sum;
+            data[k + 1] = g / sum;
+            data[k + 2] = b / sum;
+        }
+    }
+ }
