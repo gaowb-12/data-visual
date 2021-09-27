@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>滤镜函数实现美颜-像素矩阵</title>
+    <style>
+        canvas{
+            border:1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="0" height="0"></canvas>
+
+    <script type="module">
+        import { loadImg, getImageData, traverse, grayMatrix } from "/review/common/lib/utils.js"
+        import { transformColor } from "/review/common/lib/color-matrix.js"
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        
+        // 渲染
+        (async function(){
+            const img = await loadImg("./assets/girl1.jpg");
+            const { width, height } = img;
+            canvas.width = width;
+            canvas.height = height;
+
+            ctx.drawImage(img, 0, 0);
+
+            // 获取像素点
+            const imageData = getImageData(img);
+            // 处理像素点
+            const result = traverse(imageData,({r, g, b, a})=>{
+                // const v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                // return [v, v, v, a];
+                const result = transformColor([r, g, b, a], 
+                    grayMatrix(1),
+                );
+                
+                return result;
+            });
+            ctx.putImageData(result, 0, 0);
+        })();
+
+    </script>
+</body>
+</html>

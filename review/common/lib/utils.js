@@ -24,7 +24,6 @@ export function getImageData(img, rect = [0, 0, img.width, img.height]){
     return context.getImageData(...rect);
 }
 
-
 // 处理图片像素
 export function traverse(imageData, pass){
     const { width, height, data } = imageData;
@@ -42,4 +41,18 @@ export function traverse(imageData, pass){
         data.set([r, g, b, a].map(v => Math.round(v * 255)), i);
     }
     return imageData;
+}
+
+// 灰度化矩阵（0<p<1，p=1 完全灰度化）
+export function grayMatrix(p){
+    const r = 0.2126 * p;
+    const g = 0.7152 * p
+    const b = 0.0722 * p;
+
+    return [
+        r + 1 - p, g, b, 0,0,
+        r, g + 1 - p, b, 0,0,
+        r, g, b + 1 - p, 0,0,
+        0, 0, 0, 1,0,
+    ]
 }
