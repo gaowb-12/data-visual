@@ -15,32 +15,10 @@
     <canvas width="0" height="0"></canvas>
 
     <script type="module">
+        import { loadImg, getImageData, traverse } from "/review/common/lib/utils.js"
+
         const canvas = document.querySelector("canvas");
         const ctx = canvas.getContext("2d");
-
-        // 加载图片的函数
-        async function loadImg(src){
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            return new Promise((resolve)=>{
-                img.onload = function(){
-                    resolve(img);
-                }
-                img.src = src;
-            });
-        }
-        // 处理图片像素
-        function handleImageData(imageData){
-            const { width, height, data } = imageData;
-            // data.length = width * height * 4
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i],
-                    g = data[i + 1],
-                    b = data[i + 2],
-                    a = data[i + 3];
-
-            }
-        }
         
         // 渲染
         (async function(){
@@ -52,10 +30,13 @@
             ctx.drawImage(img, 0, 0);
 
             // 获取像素点
-            const imageData = ctx.getImageData(0, 0, width, height);
+            const imageData = getImageData(img);
             // 处理像素点
-            const result = handleImageData(imageData);
-
+            const result = traverse(imageData,({r, g, b, a})=>{
+                const v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                return [v, v, v, a];
+            });
+            ctx.putImageData(result, 0, 0);
         })();
 
     </script>
