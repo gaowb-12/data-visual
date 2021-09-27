@@ -11,6 +11,7 @@
         }
         #magnifier{
             position: absolute;
+            transform: scale(2);
         }
     </style>
 </head>
@@ -25,7 +26,7 @@
         const ctx = canvas.getContext("2d");
 
         const magnifierCanvas = document.getElementById("magnifier");
-        const context = magnifier.getContext("2d");
+        const context = magnifierCanvas.getContext("2d");
         
         /**
          * 获取指定半径内的图片数据
@@ -34,9 +35,30 @@
          * @param {number} x 坐标
          * @param {number} y 坐标
         */
-        function getRadiusData(imageData, radius = 150, x, y){
+        function getRadiusData(imageData, radius, x, y){
             const { width, height, data } = imageData;
-            const radiusData = [];
+            const newData = new Uint8ClampedArray(4 * (radius + 1) ** 2);
+            const h = radius / 2;
+            let offsetIn = 0;
+            // 取值为以x、y为圆心的，边长为radius的正方形区域
+            // 外圈循环为行遍历
+            for (let i = -h; i <= h; i++) {
+                const w = i + y;
+                // 外圈循环为列遍历
+                for (let j = -h; j <= h; j++) {
+                    const hj = j + x;
+                    const k = (w * width + hj) * 4;
+                    const r = data[k],
+                        g = data[k + 1],
+                        b = data[k + 2],
+                        a = data[k + 3];
+                    
+                    newData.set([r,g,b,a], offsetIn);
+                    offsetIn += 4;
+                }
+            }
+            
+            const radiusData = new ImageData(newData,radius + 1 , radius + 1);
             return radiusData;
         }
         /**
@@ -46,15 +68,18 @@
          * @param {number} x 坐标
          * @param {number} y 坐标
         */
-        function magnifier(imageData, radius = 150, x, y){
+        function magnifier(imageData, radius, x, y){
             const { width, height, data } = imageData;
             const { left, top } = canvas.getBoundingClientRect();
             magnifierCanvas.width = radius;
             magnifierCanvas.height = radius;
-            
+
+            const radiusData = getRadiusData(imageData, radius, x, y);
+            context.putImageData(radiusData, 0, 0);
 
             magnifierCanvas.style.left = (left + x - radius/2) + "px";
             magnifierCanvas.style.top = (top + y - radius/2) + "px";
+
         }
 
         // 渲染
@@ -65,16 +90,18 @@
             canvas.height = height;
 
             ctx.drawImage(img, 0, 0);
-
+            
             // 获取像素点
             const imageData = getImageData(img);
+            console.log(imageData)
             // ctx.putImageData(imageData, 0, 0);
 
             canvas.addEventListener("mousemove",(e)=>{
                 const { left, top } = canvas.getBoundingClientRect();
                 const offsetX = e.x - left;
                 const offsetY = e.y - top;
-                magnifier(imageData, 150, offsetX, offsetY);
+
+                magnifier(imageData, 100, offsetX, offsetY);
             });
         })();
 
