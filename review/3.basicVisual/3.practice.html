@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>滤镜函数实现美颜-小试牛刀</title>
+    <style>
+        canvas{
+            border:1px solid #ccc;
+        }
+        #magnifier{
+            position: absolute;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="0" height="0"></canvas>
+    <canvas id="magnifier" width="0" height="0"></canvas>
+
+    <script type="module">
+        import { loadImg, getImageData } from "/review/common/lib/utils.js"
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+
+        const magnifierCanvas = document.getElementById("magnifier");
+        const context = magnifier.getContext("2d");
+        
+        /**
+         * 获取指定半径内的图片数据
+         * @param {imageData} imageData 图片剪裁取数据
+         * @param {number} radius 放大的半径
+         * @param {number} x 坐标
+         * @param {number} y 坐标
+        */
+        function getRadiusData(imageData, radius = 150, x, y){
+            const { width, height, data } = imageData;
+            const radiusData = [];
+            return radiusData;
+        }
+        /**
+         * 放大镜效果
+         * @param {imageData} imageData 图片剪裁取数据
+         * @param {number} radius 放大的半径
+         * @param {number} x 坐标
+         * @param {number} y 坐标
+        */
+        function magnifier(imageData, radius = 150, x, y){
+            const { width, height, data } = imageData;
+            const { left, top } = canvas.getBoundingClientRect();
+            magnifierCanvas.width = radius;
+            magnifierCanvas.height = radius;
+            
+
+            magnifierCanvas.style.left = (left + x - radius/2) + "px";
+            magnifierCanvas.style.top = (top + y - radius/2) + "px";
+        }
+
+        // 渲染
+        (async function(){
+            const img = await loadImg("./assets/girl1.jpg");
+            const { width, height } = img;
+            canvas.width = width;
+            canvas.height = height;
+
+            ctx.drawImage(img, 0, 0);
+
+            // 获取像素点
+            const imageData = getImageData(img);
+            // ctx.putImageData(imageData, 0, 0);
+
+            canvas.addEventListener("mousemove",(e)=>{
+                const { left, top } = canvas.getBoundingClientRect();
+                const offsetX = e.x - left;
+                const offsetY = e.y - top;
+                magnifier(imageData, 150, offsetX, offsetY);
+            });
+        })();
+
+    </script>
+</body>
+</html>
