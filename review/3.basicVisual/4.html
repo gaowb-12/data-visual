@@ -16,7 +16,9 @@
 
     <script src="/common/lib/gl-renderer.js"></script>
 
-    <script ype="module">
+    <script type="module">
+        import { grayMatrix } from "/review/common/lib/utils.js"
+
         /**
          * 1.创建renderer对象
          * 2.创建webgl程序
@@ -29,57 +31,76 @@
         const canvas = document.querySelector("canvas");
         const renderer = new GlRenderer(canvas);
 
-        // 2.
-        const vertex = `
-            attribute vec2 a_vertexPosition;
-            attribute vec2 uv;
-            varying vec2 vUv;
+        (async function(){
 
-            void main(){
-                gl_Position = vec4(a_vertexPosition, 1.0, 1.0);
-            }
-        `;
-        const fragment = `
-            #ifdef GL_ES
-                precision mediump float;
-            #endif
+            
+            // 2.
+            const vertex = `
+                attribute vec2 a_vertexPosition;
+                attribute vec2 uv;
+                varying vec2 vUv;
 
-            varying vec2 vUv;
+                void main(){
+                    vUv = uv;
+                    gl_Position = vec4(a_vertexPosition, 1.0, 1.0);
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                    precision mediump float;
+                #endif
 
-            void main(){
-                vec2 uv = vUv;
-                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-            }
-        `;
-        const program = renderer.compileSync(fragment,vertex);
-        renderer.useProgram(program);
+                uniform sampler2D tMap;
+                uniform mat4 colorMatrix;
+                varying vec2 vUv;
 
-        // 3.
+                void main(){
+                    vec2 uv = vUv;
+                    vec4 color = texture2D(tMap, uv);
+                    gl_FragColor.rgb = (colorMatrix * vec4(color.rgb, 1.0)).rgb;
+                    gl_FragColor.a = color.a;
+                }
+            `;
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
 
-        renderer.uniforms.uTime = 0;
+            // 3.
+            const texture = await renderer.loadTexture("./assets/girl3.jpg");
+            renderer.uniforms.tMap = texture;
+            
+            const r = 0.2126;
+            const g = 0.7152
+            const b = 0.0722;
+            renderer.uniforms.colorMatrix = [
+                r, r, r, 0 ,
+                g, g, g, 0 ,
+                b, b, b, 0 ,
+                0, 0, 0, 1 
+            ];
 
-        // 4.
-        renderer.setMeshData([{
-            positions:[
-                [-1, -1],
-                [-1, 1],
-                [1, 1],
-                [1, -1],
-            ],
-            attributes:{
-                uv:[
-                    [0, 0],
-                    [0, 1],
+            // 4.
+            renderer.setMeshData([{
+                positions:[
+                    [-1, -1],
+                    [-1, 1],
                     [1, 1],
-                    [1, 0],
-                ]
-            },
-            cells: [[0, 1, 2], [2, 0, 3]],
-        }]);
+                    [1, -1],
+                ],
+                attributes:{
+                    uv:[
+                        [0, 0],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                    ]
+                },
+                cells: [[0, 1, 2], [2, 0, 3]],
+            }]);
 
-        // 5.
-        renderer.render();
-
+            // 5.
+            renderer.render();
+        })()
+        
     </script>
 </body>
 </html>
