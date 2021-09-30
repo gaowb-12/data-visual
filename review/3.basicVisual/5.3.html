@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>片元着色器进行几何造型-绘制三角形</title>
+    <style>
+        canvas{
+            border:1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="554" height="554"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+
+    <script type="module">
+        import { grayMatrix } from "/review/common/lib/utils.js"
+        /**
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.创建uniform变量
+         * 4.将数据存入缓冲区
+         * 5.渲染
+         * */ 
+
+        //  1.
+        const canvas = document.querySelector("canvas");
+        const renderer = new GlRenderer(canvas);
+
+        (async function(){
+            // 2.
+            const vertex = `
+                attribute vec2 a_vertexPosition;
+                attribute vec2 uv;
+                varying vec2 vUv;
+
+                void main(){
+                    vUv = uv;
+                    gl_Position = vec4(a_vertexPosition, 1.0, 1.0);
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                    precision mediump float;
+                #endif
+                
+                uniform vec2 uResolution;
+                uniform vec2 uMouse[3];
+                varying vec2 vUv;
+
+                // 绘制线段
+                float seg_distance(vec2 origin, vec2 uv, vec2 mouse){
+                    vec2 v = uv - origin;
+                    vec2 st = mouse - origin;
+                    // 通过向量点乘确定点是否在线段上，还是在线段的延长线上
+                    float result = dot(v, normalize(st)) / length(st);
+                    float d;
+                    if(result < 0.0 || result > 1.0)
+                        d = min(length(v), length(uv - mouse));
+                    else
+                        d = abs(cross(vec3(v, 0.0), normalize(vec3(st, 0.0))).z);
+                    return d;
+                }
+                // 判断点在三角形内部，返回距离（内部为正，外部为负）
+                float triangle_distance(vec2 p, vec2 a, vec2 b, vec2 c){
+                    vec2 ab = b - a;
+                    vec2 bc = c - b;
+                    vec2 ca = a - c;
+
+                    float a1 = cross(vec3(p - a, 0), vec3(ab,0.0)).z;
+                    float a2 = cross(vec3(p - b, 0), vec3(bc,0.0)).z;
+                    float a3 = cross(vec3(p - c, 0), vec3(ca,0.0)).z;
+
+                    if((a1 > 0.0 && a2 > 0.0 && a3 > 0.0)||(a1 < 0.0 && a2 < 0.0 && a3 < 0.0)){
+                        return -min(min(abs(a1), abs(a2)), abs(a3));
+                    }
+                    return min(min(seg_distance(a, p, b), seg_distance(b,p, c)), seg_distance(c,p,a));
+                }
+
+                void main(){
+
+                    // 通过二维向量叉乘计算点到向量st的距离
+                    float d = triangle_distance(vUv, uMouse[0], uMouse[1], uMouse[2]);
+                    d = 1.0 - smoothstep(0.00, 0.005, d);
+
+                    gl_FragColor.rgb = vec3(d);
+                    gl_FragColor.a = 1.0;
+                }
+            `;
+
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+
+            // 3.
+            renderer.uniforms.uMouse = [0.3,0.3, 0.7,0.3, 0.5,0.6];
+            renderer.uniforms.uResolution = [1000, 554];
+
+            // 4.
+            renderer.setMeshData([{
+                positions:[
+                    [-1, -1],
+                    [-1, 1],
+                    [1, 1],
+                    [1, -1],
+                ],
+                attributes:{
+                    uv:[
+                        [0, 0],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                    ]
+                },
+                cells: [[0, 1, 2], [2, 0, 3]],
+            }]);
+
+            // 5.
+            renderer.render();
+
+        })();
+        
+    </script>
+</body>
+</html>
