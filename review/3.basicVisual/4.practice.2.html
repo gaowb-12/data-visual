@@ -63,31 +63,28 @@
                     vec4 color = texture2D(tMap, st);
                     
                     // 高斯模糊实现
-                    float r = 0.0, g = 0.0, b = 0.0;
+                    vec3 tColor1 = vec3(0.0, 0.0, 0.0);
+                    vec3 tColor2 = vec3(0.0, 0.0, 0.0);
+
+                    // x方向
                     for(int i = -3; i <= 3; i++){
                         float x = gl_FragCoord.x + float(i);
                         if(x > 0.0 && x < uResolution.x){
                             vec4 tColor = texture2D(tMap, vec2(x, gl_FragCoord.y) / uResolution);
-                            r += tColor.r * tGaussian[i + 3];
-                            g += tColor.g * tGaussian[i + 3];
-                            b += tColor.b * tGaussian[i + 3];
+                            tColor1.rgb += tColor.rgb * tGaussian[i + 3];
                         }
                     }
-                    color.rgb = vec3(r, g, b);
                     
-                    r = 0.0, g = 0.0, b = 0.0;
+                    // y方向
                     for(int i = -3; i <= 3; i++){
                         float y = gl_FragCoord.y + float(i);
                         if(y > 0.0 && y < uResolution.y){
                             vec4 tColor = texture2D(tMap, vec2(gl_FragCoord.x, y) / uResolution);
-                            r += tColor.r * tGaussian[i + 3];
-                            g += tColor.g * tGaussian[i + 3];
-                            b += tColor.b * tGaussian[i + 3];
+                            tColor2.rgb += tColor.rgb * tGaussian[i + 3];
                         }
                     }
-                    color.rgb = vec3(r, g, b);
 
-                    gl_FragColor.rgb = color.rgb;
+                    gl_FragColor.rgb = mix(tColor1, tColor2, 0.5);
                     gl_FragColor.a = color.a;
                 }
             `;
