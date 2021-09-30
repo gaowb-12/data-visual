@@ -12,7 +12,7 @@
     </style>
 </head>
 <body>
-    <canvas width="960" height="540"></canvas>
+    <canvas width="1000" height="554"></canvas>
 
     <script src="/common/lib/gl-renderer.js"></script>
 
@@ -50,13 +50,42 @@
                 #endif
 
                 uniform sampler2D tMap;
-                uniform mat3 tGaussian;
+                uniform float tGaussian[7];
+                uniform int uRadius;
+                uniform vec2 uResolution;
 
                 varying vec2 vUv;
 
                 void main(){
-                    vec2 st = vUv;
+                    
+                    // 取当前的坐标点
+                    vec2 st = gl_FragCoord.xy / uResolution;
                     vec4 color = texture2D(tMap, st);
+                    
+                    // 高斯模糊实现
+                    float r = 0.0, g = 0.0, b = 0.0;
+                    for(int i = -3; i <= 3; i++){
+                        float x = gl_FragCoord.x + float(i);
+                        if(x > 0.0 && x < uResolution.x){
+                            vec4 tColor = texture2D(tMap, vec2(x, gl_FragCoord.y) / uResolution);
+                            r += tColor.r * tGaussian[i + 3];
+                            g += tColor.g * tGaussian[i + 3];
+                            b += tColor.b * tGaussian[i + 3];
+                        }
+                    }
+                    color.rgb = vec3(r, g, b);
+                    
+                    r = 0.0, g = 0.0, b = 0.0;
+                    for(int i = -3; i <= 3; i++){
+                        float y = gl_FragCoord.y + float(i);
+                        if(y > 0.0 && y < uResolution.y){
+                            vec4 tColor = texture2D(tMap, vec2(gl_FragCoord.x, y) / uResolution);
+                            r += tColor.r * tGaussian[i + 3];
+                            g += tColor.g * tGaussian[i + 3];
+                            b += tColor.b * tGaussian[i + 3];
+                        }
+                    }
+                    color.rgb = vec3(r, g, b);
 
                     gl_FragColor.rgb = color.rgb;
                     gl_FragColor.a = color.a;
@@ -66,12 +95,16 @@
             renderer.useProgram(program);
 
             // 3.
-            const texture = await renderer.loadTexture("./assets/girl3.jpg");
+            const texture = await renderer.loadTexture("./assets/girl1.jpg");
             renderer.uniforms.tMap = texture;
             
             // 生成高斯权重矩阵
             let gaussianM = gaussianMatrix(3);
             renderer.uniforms.tGaussian = gaussianM.matrix;
+            renderer.uniforms.uRadius = 3;
+
+            // 画布的实际宽高
+            renderer.uniforms.uResolution = [1000.0, 554.0];
 
             // 4.
             renderer.setMeshData([{
