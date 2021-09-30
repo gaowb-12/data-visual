@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>片元着色器进行几何造型-绘制圆、线段、几何图形</title>
+    <title>片元着色器进行几何造型-绘制线段</title>
     <style>
         canvas{
             border:1px solid #ccc;
@@ -46,32 +46,34 @@
                 #ifdef GL_ES
                     precision mediump float;
                 #endif
-
-                uniform sampler2D tMap;
+                
                 uniform vec2 uResolution;
-                uniform float uTime;
-
+                uniform vec2 uMouse;
+                uniform vec2 uOrigin;
                 varying vec2 vUv;
 
-                // 随机数
-                float random(vec2 st){
-                    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+                // 绘制线段
+                float stripeLine(vec2 origin, vec2 uv, vec2 mouse){
+                    vec2 v = uv - origin;
+                    vec2 st = mouse - origin;
+                    // 通过向量点乘确定点是否在线段上，还是在线段的延长线上
+                    float result = dot(v, normalize(st)) / length(st);
+                    float d;
+                    if(result < 0.0 || result > 1.0)
+                        d = min(length(v), length(uv - mouse));
+                    else
+                        d = abs(cross(vec3(v, 0.0), normalize(vec3(st, 0.0))).z);
+                    return d;
                 }
 
                 void main(){
-                    vec2 st = vUv * 100.0;
-                    st.y *= uResolution.y / uResolution.x;
+                    vec3 st = vec3(uMouse - uOrigin, 0.0);
 
-                    vec2 f = fract(st);
+                    // 通过二维向量叉乘计算点到向量st的距离
+                    float d = stripeLine(uOrigin, vUv, uMouse);
+                    d = 1.0 - smoothstep(0.00, 0.005, d);
 
-                    vec4 color = texture2D(tMap, vUv);
-
-                    float p = uTime + random(floor(st));
-                    float shading = 0.5 + 0.5 * sin(p);
-                    float d = distance(f, vec2(0.5, 0.5));
-                    d = smoothstep(d, d + 0.01, shading);
-
-                    gl_FragColor.rgb = d * color.rgb;
+                    gl_FragColor.rgb = vec3(d);
                     gl_FragColor.a = 1.0;
                 }
             `;
@@ -80,11 +82,10 @@
             renderer.useProgram(program);
 
             // 3.
-            const texture = await renderer.loadTexture("./assets/girl1.jpg");
-            renderer.uniforms.tMap = texture;
-            renderer.uniforms.uResolution = [1000.0, 554.0];
-            renderer.uniforms.uTime = 0;
-            
+            renderer.uniforms.uOrigin = [0.5, 0.5];
+            renderer.uniforms.uMouse = [1.0, 1.0];
+            renderer.uniforms.uResolution = [1000, 554];
+
             // 4.
             renderer.setMeshData([{
                 positions:[
@@ -107,13 +108,13 @@
             // 5.
             renderer.render();
 
-            function update(t){
-                renderer.uniforms.uTime = t * 0.002;
-                requestAnimationFrame(update);
-            }
-            setTimeout(() => {
-                requestAnimationFrame(update);
-            }, 0);
+            canvas.addEventListener("mousemove", function(e){
+                const { left, top, width, height } = canvas.getBoundingClientRect();
+                let offsetX = e.x - left;
+                let offsetY = e.y - top;
+
+                renderer.uniforms.uMouse = [offsetX / width, 1 - offsetY / height];
+            });
 
         })();
         
