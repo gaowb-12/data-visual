@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极坐标系绘制有趣图案-极坐标方程绘制曲线</title>
+    <style>
+        canvas{
+            border:1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="0" height="0"></canvas>
+
+    <script type="module">
+        import { loadImg, getImageData, traverse } from "/review/common/lib/utils.js"
+
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        
+        // 极坐标系转直角坐标系
+        function fromPolar(r, radius){
+            const x = r * Math.cos(radius);
+            const y = r * Math.sin(radius);
+            return [x, y];
+        }
+        // 直角坐标系转极坐标系
+        function toPolar(x, y){
+            const r = Math.hypot(x, y);
+            const radius = Math.atan2(y, x);
+            return [r, radius];
+        }
+
+        // 渲染
+        (async function(){
+            
+        })();
+
+    </script>
+</body>
+</html>
