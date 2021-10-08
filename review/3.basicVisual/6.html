@@ -12,13 +12,15 @@
     </style>
 </head>
 <body>
-    <canvas width="0" height="0"></canvas>
+    <canvas width="512" height="512"></canvas>
 
     <script type="module">
         import { loadImg, getImageData, traverse } from "/review/common/lib/utils.js"
 
         const canvas = document.querySelector("canvas");
         const ctx = canvas.getContext("2d");
+
+        ctx.translate(canvas.width / 2, canvas.height / 2);
         
         // 极坐标系转直角坐标系
         function fromPolar(r, radius){
@@ -33,9 +35,47 @@
             return [r, radius];
         }
 
+        function draw(points, ctx){
+            ctx.beginPath();
+            ctx.moveTo(...points[0]);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(...points[i]);
+            }
+            ctx.stroke();
+        }
+
+        // 参数方程
+        function parametric(xFunc, yFunc, rFunc){
+            return function(start, end, segments = 100, ...args){
+                const points = [];
+
+                let p = end - start;
+                let u = p / segments;
+                for (let i = 0; i <= segments; i++) {
+                    let t = start + i * u;
+                    const x = xFunc(t, ...args);
+                    const y = yFunc(t, ...args);
+                    if(rFunc)
+                        points.push(rFunc(x, y));
+                    else
+                        points.push([x, y]);
+                }
+                return {
+                    points,
+                    draw:draw.bind(null,points)
+                }
+            }
+        }
+
         // 渲染
         (async function(){
-            
+            // 画圆半径200
+            let circle200 = parametric(
+                (t) => 200,
+                (t) => (t),
+                fromPolar
+            );
+            circle200(0, 2 * Math.PI).draw(ctx);
         })();
 
     </script>
