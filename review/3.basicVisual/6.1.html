@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极坐标系绘制有趣图案-片元着色器与极坐标系绘制图案</title>
+    <style>
+        canvas{
+            border:1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="554" height="554"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+
+    <script type="module">
+        import { grayMatrix } from "/review/common/lib/utils.js"
+
+        /**
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.创建uniform变量
+         * 4.将数据存入缓冲区
+         * 5.渲染
+         * */ 
+
+        //  1.
+        const canvas = document.querySelector("canvas");
+        const renderer = new GlRenderer(canvas);
+
+        (async function(){
+            // 2.
+            const vertex = `
+                attribute vec2 a_vertexPosition;
+                attribute vec2 uv;
+                varying vec2 vUv;
+
+                void main(){
+                    vUv = uv;
+                    gl_Position = vec4(a_vertexPosition, 1.0, 1.0);
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                    precision mediump float;
+                #endif
+
+                uniform sampler2D tMap;
+                uniform float uTime;
+
+                varying vec2 vUv;
+
+                vec2 toPolar(vec2 st){
+                    float radius = atan(st.y, st.x);
+                    float r = length(st);
+                    return vec2(r, radius);
+                }
+
+                void main(){
+                    vec2 st = vUv - 0.5;
+
+                    vec2 polar = toPolar(st);
+                    float d = 0.5 * cos(polar.y * 3.0) - polar.x;
+                    d = smoothstep(-0.01, 0.01, d);
+
+                    gl_FragColor.rgb = vec3(d);
+                    gl_FragColor.a = 1.0;
+                }
+            `;
+
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+
+            // 3.
+            
+            // 4.
+            renderer.setMeshData([{
+                positions:[
+                    [-1, -1],
+                    [-1, 1],
+                    [1, 1],
+                    [1, -1],
+                ],
+                attributes:{
+                    uv:[
+                        [0, 0],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                    ]
+                },
+                cells: [[0, 1, 2], [2, 0, 3]],
+            }]);
+
+            // 5.
+            renderer.render();
+        })();
+        
+    </script>
+</body>
+</html>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>极坐标绘制有趣图案-极坐标方程绘制曲线</title>
+    <title>极坐标系绘制有趣图案-极坐标方程绘制曲线</title>
     <style>
         canvas{
             border:1px solid #ccc;
@@ -12,24 +12,72 @@
     </style>
 </head>
 <body>
-    <canvas width="554" height="554"></canvas>
+    <canvas width="512" height="512"></canvas>
 
-    <script src="/common/lib/gl-renderer.js"></script>
     <script type="module">
+        import { loadImg, getImageData, traverse } from "/review/common/lib/utils.js"
 
-        /**
-         * 1.创建renderer对象
-         * 2.创建webgl程序
-         * 3.创建uniform变量
-         * 4.将数据存入缓冲区
-         * 5.渲染
-         * */ 
-
-        //  1.
         const canvas = document.querySelector("canvas");
-        const renderer = new GlRenderer(canvas);
+        const ctx = canvas.getContext("2d");
+
+        ctx.translate(canvas.width / 2, canvas.height / 2);
         
-        
+        // 极坐标系转直角坐标系
+        function fromPolar(r, radius){
+            const x = r * Math.cos(radius);
+            const y = r * Math.sin(radius);
+            return [x, y];
+        }
+        // 直角坐标系转极坐标系
+        function toPolar(x, y){
+            const r = Math.hypot(x, y);
+            const radius = Math.atan2(y, x);
+            return [r, radius];
+        }
+
+        function draw(points, ctx){
+            ctx.beginPath();
+            ctx.moveTo(...points[0]);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(...points[i]);
+            }
+            ctx.stroke();
+        }
+
+        // 参数方程
+        function parametric(xFunc, yFunc, rFunc){
+            return function(start, end, segments = 100, ...args){
+                const points = [];
+
+                let p = end - start;
+                let u = p / segments;
+                for (let i = 0; i <= segments; i++) {
+                    let t = start + i * u;
+                    const x = xFunc(t, ...args);
+                    const y = yFunc(t, ...args);
+                    if(rFunc)
+                        points.push(rFunc(x, y));
+                    else
+                        points.push([x, y]);
+                }
+                return {
+                    points,
+                    draw:draw.bind(null,points)
+                }
+            }
+        }
+
+        // 渲染
+        (async function(){
+            // 画圆半径200
+            let circle200 = parametric(
+                (t) => 200,
+                (t) => (t),
+                fromPolar
+            );
+            circle200(0, 2 * Math.PI).draw(ctx);
+        })();
+
     </script>
 </body>
 </html>
