@@ -54,13 +54,15 @@
                 varying vec2 vUv;
 
                 vec2 toPolar(vec2 st){
-                    float radius = atan(st.x, st.y);
+                    float radius = atan(st.y, st.x);
                     float r = length(st);
                     return vec2(r, radius);
                 }
 
                 void main(){
-                    vec2 st = vUv - 0.5;
+                    // 让苹果变正向
+                    vec2 st = vec2(vUv.x, 1.0 - vUv.y) - 0.5;
+                    st = st.yx;
 
                     vec2 polar = toPolar(st);
                     // polar.y的范围是-π到π
