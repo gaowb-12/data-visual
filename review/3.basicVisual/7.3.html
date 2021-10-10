@@ -87,9 +87,9 @@
                     vec2 fl = floor(st);
                     vec2 fr = fract(st);
 
-                    float d = smoothstep(0.0, 1.0, mod(fl.y, 2.0));
+                    float d = smoothstep(0.0, 1.0, abs(sin(st.y * 3.1415) + 1.0));
 
-                    gl_FragColor.rgb = vec3(d);
+                    gl_FragColor.rgb = 1.0 - vec3(d);
                     gl_FragColor.a = 1.0;
                 }
             `;
