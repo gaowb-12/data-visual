@@ -67,12 +67,13 @@
                     vec2 fr = fract(st);
                     // 生成随机特征点（距离中心点）
                     vec2 r = random2(fl);
-                    float d = distance(fr, r);
+                    float d = 1.0;
 
                     // 计算坐标点到周围9个网格特征点的距离的最小值，平滑过度
                     for(int i = -1; i <= 1; i++){
                         for(int j = -1; j <= 1; j++){
                             vec2 r = random2(fl + vec2(i, j));
+                            r =  0.5 + 0.5 * sin(uTime + 6.2831 * r);
                             d = min(d, distance(fr, r + vec2(i, j)));
                         }
                     }
@@ -109,6 +110,11 @@
             // 5.
             renderer.render();
 
+            function update(t){
+                renderer.uniforms.uTime = t * 0.002;
+                requestAnimationFrame(update)
+            }
+            update(0)
         })();
         
     </script>
