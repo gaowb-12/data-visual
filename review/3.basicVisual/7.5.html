@@ -48,7 +48,14 @@
                     precision mediump float;
                 #endif
 
+                uniform float uTime;
                 varying vec2 vUv;
+
+                vec3 hsv2rgb(vec3 c){
+                    vec3 rgb = clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0), 6.0)-3.0)-1.0, 0.0, 1.0);
+                    rgb = rgb * rgb * (3.0 - 2.0 * rgb);
+                    return c.z * mix(vec3(1.0), rgb, c.y);
+                }
 
                 // 二维随机向量，值域范围（-1,1）
                 vec2 random2(vec2 st){
@@ -75,13 +82,29 @@
                         u.y);
                 }
 
+                float mist(vec2 st){
+                    float d = 0.0;
+
+                    float scale = 1.0;
+                    float weight = 0.5;
+                    // 将噪声叠加6次
+                    for(int i = 0; i < 6; i++){
+                        //通过范围跟权重叠加结果
+                        d += weight * noise(st * scale);
+                        // 每次叠加范围扩大一倍，权重减半
+                        weight *= 0.5;
+                        scale *= 2.0;
+                    }
+                    return d;
+                }
+
                 void main(){
                     vec2 st = vUv;
-                    st *= 20.0;
-                    
-                    float d = noise(st);
+                    st.x += uTime * 0.3;
 
-                    gl_FragColor.rgb = vec3(d * 0.5 + 0.5);
+                    float d = mist(st);
+
+                    gl_FragColor.rgb = hsv2rgb(vec3(d, 1.0, 1.0));
                     gl_FragColor.a = 1.0;
                 }
             `;
@@ -90,7 +113,7 @@
             renderer.useProgram(program);
 
             // 3.
-            
+            renderer.uniforms.uTime = 0.0;
             // 4.
             renderer.setMeshData([{
                 positions:[
@@ -112,6 +135,12 @@
 
             // 5.
             renderer.render();
+
+            function update(t){
+                renderer.uniforms.uTime = t * 0.0005;
+                requestAnimationFrame(update)
+            }
+            update(0);
         })();
         
     </script>
