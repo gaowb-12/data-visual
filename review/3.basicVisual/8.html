@@ -130,18 +130,23 @@
                     weight[4] = 0.016216;
 
                     // 高斯模糊
-                    for(int i=-2; i<=2; i++){
+                    vec3 result = color.rgb;
+                    result *= weight[0];
+                    for(int i = 1; i < 5; i++){
                         // 位置偏移
                         float f = float(i);
                         if(axis == 0){
                             // 对x轴进行计算
+                            result += texture2D(tMap, vUv + vec2(st.x * f, 0.0)).rgb * weight[i];
+                            result += texture2D(tMap, vUv - vec2(st.x * f, 0.0)).rgb * weight[i];
                         }else{
                             // 对y轴进行计算
+                            result += texture2D(tMap, vUv + vec2(0.0, st.y * f)).rgb * weight[i];
+                            result += texture2D(tMap, vUv - vec2(0.0, st.y * f)).rgb * weight[i];
                         }
-                        // color += texture2D(tMap, vUv);
                     }
 
-                    gl_FragColor.rgb = color.rgb;
+                    gl_FragColor.rgb = result;
                     gl_FragColor.a = 1.0;
                 }
             `;
@@ -150,7 +155,7 @@
             renderer.useProgram(program);
 
             // 3.
-            renderer.uniforms.uResolution = [512, 512];
+            renderer.uniforms.axis = 0;
             // 4.
             renderer.setMeshData([{
                 positions:[
@@ -171,18 +176,53 @@
             }]);
 
             // 第一步：将图形输出到帧缓存对象上
-            const fbo = renderer.createFBO();
-            renderer.bindFBO(fbo);//绑定帧缓冲对象
+            const fbo1 = renderer.createFBO();
+            const fbo2 = renderer.createFBO();
+            renderer.bindFBO(fbo1);//绑定帧缓冲对象
             renderer.render();//渲染到帧缓冲对象上
-            renderer.bindFBO(null);//解绑
+            const program1 = renderer.compileSync(blurFragment,vertex);
             
             // 第二步：编译blur着色器
-            const program1 = renderer.compileSync(blurFragment,vertex);
+            // 第一遍
+            // x轴进行高斯模糊
             renderer.useProgram(program1);
-            renderer.uniforms.tMap = fbo.texture;
+            renderer.uniforms.tMap = fbo1.texture;
+            renderer.uniforms.axis = 0;
+            renderer.uniforms.uResolution = [554.0, 554.0];
             renderer.setMeshData(program.meshData);
+            renderer.bindFBO(fbo2);
             renderer.render();
 
+            // y轴进行高斯模糊
+            renderer.useProgram(program1);
+            renderer.uniforms.tMap = fbo2.texture;
+            renderer.uniforms.axis = 1;
+            renderer.uniforms.uResolution = [554.0, 554.0];
+            renderer.setMeshData(program.meshData);
+            renderer.bindFBO(fbo1);
+            renderer.render();
+
+
+            // 第二遍
+            // x轴进行高斯模糊
+            renderer.useProgram(program1);
+            renderer.uniforms.tMap = fbo1.texture;
+            renderer.uniforms.axis = 0;
+            renderer.uniforms.uResolution = [554.0, 554.0];
+            renderer.setMeshData(program.meshData);
+            renderer.bindFBO(fbo2);
+            renderer.render();
+
+            // y轴进行高斯模糊
+            renderer.useProgram(program1);
+            renderer.uniforms.tMap = fbo2.texture;
+            renderer.uniforms.axis = 1;
+            renderer.uniforms.uResolution = [554.0, 554.0];
+            renderer.setMeshData(program.meshData);
+            renderer.bindFBO(fbo1);
+            renderer.render();
+
+            renderer.bindFBO(null);//解绑
             // 5.
             renderer.render();
         })();
