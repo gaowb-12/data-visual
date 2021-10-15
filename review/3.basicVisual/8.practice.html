@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后期处理通道增强图像效果-烟雾随风向变化</title>
+    <style>
+        canvas{
+            border:1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="554" height="554"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+
+    <script type="module">
+        import { grayMatrix } from "/review/common/lib/utils.js"
+
+        /**
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.创建uniform变量
+         * 4.将数据存入缓冲区
+         * 5.渲染
+         * */ 
+
+        //  1.
+        const canvas = document.querySelector("canvas");
+        const renderer = new GlRenderer(canvas);
+
+        (async function(){
+            // 2.
+            const vertex = `
+                attribute vec2 a_vertexPosition;
+                attribute vec2 uv;
+                varying vec2 vUv;
+
+                void main(){
+                    vUv = uv;
+                    gl_Position = vec4(a_vertexPosition, 1.0, 1.0);
+                }
+            `;
+            const fragment = `
+            #ifdef GL_ES
+                precision highp float;
+                #endif
+
+                uniform sampler2D tMap;
+                uniform float uTime;
+
+                varying vec2 vUv;
+
+                // 二维随机数
+                float random(vec2 st){
+                    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+                }
+                // 二维噪声
+                float noise(vec2 st){
+                    vec2 i = floor(st);
+                    vec2 f = fract(st);
+                    f = smoothstep(0.0, 1.0, f);
+                    // 对x、y方向分别做线性插值
+                    return mix(
+                        mix(random(i + vec2(0.0,0.0)), random(i + vec2(1.0,0.0)), f.x), 
+                        mix(random(i + vec2(0.0,1.0)), random(i + vec2(1.0,1.0)), f.x), 
+                        f.y);
+                }
+
+                void main() {
+                    vec3 smoke = vec3(0.0);
+                    if( uTime <= 0.0 ){
+                        vec2 st = vUv - 0.5;
+                        float d = length(st);
+                        smoke += 1.0 - smoothstep(0.045, 0.05, d);
+                    }
+
+                    
+                    vec2 uv = vUv;
+                    // 风向向量
+                    // vec2 wind = 0.1 * vec2(noise(uv+ uTime), noise(uv - uTime));
+                    // uv += wind;
+
+                    float offset = 1.0 / 554.0;
+
+                    vec3 color = texture2D(tMap, uv).rgb;
+
+                    // 取周围的四个点做烟雾扩散模型
+                    vec3 left = texture2D(tMap, uv + vec2(-offset, 0.0)).rgb;
+                    vec3 right = texture2D(tMap, uv + vec2(offset, 0.0)).rgb;
+                    vec3 up = texture2D(tMap, uv + vec2(0.0, -offset)).rgb;
+                    vec3 down = texture2D(tMap, uv + vec2(0.0, offset)).rgb;
+
+                    // 增加噪声，增加随机性
+                    float r = noise(uv + 5.0 * uTime);
+                    // 烟雾扩散模型公式
+                    color += 8.0 * 0.016 * (
+                        (1.0 + r) * left + 
+                        (1.0 - r) * right + 
+                        down + 
+                        2.0 * up - 
+                        5.0 * color
+                    );
+                    
+                    gl_FragColor.rgb = color + smoke;
+                    gl_FragColor.a = 1.0;
+                }
+            `;
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+
+            // 3.
+            renderer.uniforms.uTime = 0.0;
+            // 4.
+            renderer.setMeshData([{
+                positions:[
+                    [-1, -1],
+                    [-1, 1],
+                    [1, 1],
+                    [1, -1],
+                ],
+                attributes:{
+                    uv:[
+                        [0, 0],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                    ]
+                },
+                cells: [[0, 1, 2], [2, 0, 3]],
+            }]);
+
+            // 5.
+            renderer.render();
+
+
+            let fbo1 = renderer.createFBO();
+            let fbo2 = renderer.createFBO();
+            function update(t){
+                // 输出到画布
+                renderer.bindFBO(null);
+                renderer.uniforms.tMap = fbo1.texture;
+                renderer.uniforms.uTime = t / 1000;
+                renderer.render();
+
+                // 同时输出到fbo1
+                renderer.bindFBO(fbo2);//绑定帧缓冲对象
+                renderer.uniforms.tMap = fbo1.texture;
+                [fbo1, fbo2] = [fbo2, fbo1];
+                renderer.render();//渲染到帧缓冲对象上
+                
+                requestAnimationFrame(update);
+            }   
+            update(0)
+
+
+        })();
+        
+    </script>
+</body>
+</html>
