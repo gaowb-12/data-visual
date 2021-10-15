@@ -53,6 +53,22 @@
 
                 varying vec2 vUv;
 
+                // 二维随机数
+                float random(vec2 st){
+                    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+                }
+                // 二维噪声
+                float noise(vec2 st){
+                    vec2 i = floor(st);
+                    vec2 f = fract(st);
+                    f = smoothstep(0.0, 1.0, f);
+                    // 对x、y方向分别做线性插值
+                    return mix(
+                        mix(random(i + vec2(0.0,0.0)), random(i + vec2(1.0,0.0)), f.x), 
+                        mix(random(i + vec2(0.0,1.0)), random(i + vec2(1.0,1.0)), f.x), 
+                        f.y);
+                }
+
                 void main() {
                     vec3 smoke = vec3(0.0);
                     if( uTime <= 0.0 ){
@@ -60,11 +76,29 @@
                         float d = length(st);
                         smoke += 1.0 - smoothstep(0.045, 0.05, d);
                     }
-                    
+
                     vec2 uv = vUv;
-                    uv.y -= 0.001;
+                    float offset = 1.0 / 554.0;
+
                     vec3 color = texture2D(tMap, uv).rgb;
 
+                    // 取周围的四个点做烟雾扩散模型
+                    vec3 left = texture2D(tMap, uv + vec2(-offset, 0.0)).rgb;
+                    vec3 right = texture2D(tMap, uv + vec2(offset, 0.0)).rgb;
+                    vec3 up = texture2D(tMap, uv + vec2(0.0, -offset)).rgb;
+                    vec3 down = texture2D(tMap, uv + vec2(0.0, offset)).rgb;
+
+                    // 增加噪声，增加随机性
+                    float r = noise(uv + 5.0 * uTime);
+                    // 烟雾扩散模型公式
+                    color += 8.0 * 0.016 * (
+                        (1.0 + r) * left + 
+                        (1.0 - r) * right + 
+                        down + 
+                        2.0 * up - 
+                        5.0 * color
+                    );
+                    
                     gl_FragColor.rgb = color + smoke;
                     gl_FragColor.a = 1.0;
                 }
