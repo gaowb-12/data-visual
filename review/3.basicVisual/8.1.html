@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后期处理通道增强图像效果-辉光效果</title>
+    <style>
+        canvas{
+            border:1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="554" height="554"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+
+    <script type="module">
+        import { grayMatrix } from "/review/common/lib/utils.js"
+
+        /**
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.创建uniform变量
+         * 4.将数据存入缓冲区
+         * 5.渲染
+         * */ 
+
+        //  1.
+        const canvas = document.querySelector("canvas");
+        const renderer = new GlRenderer(canvas);
+
+        (async function(){
+            // 2.
+            const vertex = `
+                attribute vec2 a_vertexPosition;
+                attribute vec2 uv;
+                varying vec2 vUv;
+
+                void main(){
+                    vUv = uv;
+                    gl_Position = vec4(a_vertexPosition, 1.0, 1.0);
+                }
+            `;
+            
+            // 绘制形状
+            const fragment = `
+            #ifdef GL_ES
+                precision highp float;
+                #endif
+
+                float line_distance(in vec2 st, in vec2 a, in vec2 b) {
+                    vec3 ab = vec3(b - a, 0);
+                    vec3 p = vec3(st - a, 0);
+                    float l = length(ab);
+                    return cross(p, normalize(ab)).z;
+                }
+
+                float seg_distance(in vec2 st, in vec2 a, in vec2 b) {
+                    vec3 ab = vec3(b - a, 0);
+                    vec3 p = vec3(st - a, 0);
+                    float l = length(ab);
+                    float d = abs(cross(p, normalize(ab)).z);
+                    float proj = dot(p, ab) / l;
+                    if(proj >= 0.0 && proj <= l) return d;
+                    return min(distance(st, a), distance(st, b));
+                }
+
+                float triangle_distance(in vec2 st, in vec2 a, in vec2 b, in vec2 c) {
+                    float d1 = line_distance(st, a, b);
+                    float d2 = line_distance(st, b, c);
+                    float d3 = line_distance(st, c, a);
+
+                    if(d1 >= 0.0 && d2 >= 0.0 && d3 >= 0.0 || d1 <= 0.0 && d2 <= 0.0 && d3 <= 0.0) {
+                        return -min(abs(d1), min(abs(d2), abs(d3))); // 内部距离为负
+                    }
+                    
+                    return min(seg_distance(st, a, b), min(seg_distance(st, b, c), seg_distance(st, c, a))); // 外部为正
+                }
+
+                float random (vec2 st) {
+                    return fract(sin(dot(st.xy,
+                                        vec2(12.9898,78.233)))*
+                        43758.5453123);
+                }
+
+                vec3 hsb2rgb(vec3 c){
+                    vec3 rgb = clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0), 6.0)-3.0)-1.0, 0.0, 1.0);
+                    rgb = rgb * rgb * (3.0 - 2.0 * rgb);
+                    return c.z * mix(vec3(1.0), rgb, c.y);
+                }
+                varying vec2 vUv;
+
+                void main() {
+                    vec2 st = vUv;
+                    st *= 10.0;
+                    vec2 i_st = floor(st);
+                    vec2 f_st = 2.0 * fract(st) - vec2(1);
+                    float r = random(i_st);
+                    float sign = 2.0 * step(0.5, r) - 1.0;
+                    
+                    float d = triangle_distance(f_st, vec2(-1), vec2(1), sign * vec2(1, -1));
+                    gl_FragColor.rgb = (smoothstep(-0.85, -0.8, d) - smoothstep(0.0, 0.05, d)) * hsb2rgb(vec3(r + 1.2, 0.5, r));
+                    gl_FragColor.a = 1.0;
+                }
+            `;
+
+            // 高斯模糊滤镜
+            const blurFragment = `
+                #ifdef GL_ES
+                precision highp float;
+                #endif
+                
+                uniform sampler2D tMap;
+                uniform vec2 uResolution;
+                uniform int axis;
+                uniform float filter;
+
+
+                varying vec2 vUv;
+
+                void main() {
+                    vec2 st = vUv;
+                    // 每个像素的大小
+                    st = 1.0 / uResolution;
+                    
+                    vec4 color = texture2D(tMap, vUv);
+                    
+                    // 过滤某个亮度，vec3(0.2126, 0.7152, 0.0722)权重决定了亮度
+                    float brightness = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+                    brightness = step(filter, brightness);
+                    
+                    // 高斯模糊权重
+                    float weight[5];
+                    weight[0] = 0.227027;
+                    weight[1] = 0.1945946;
+                    weight[2] = 0.1216216;
+                    weight[3] = 0.054054;
+                    weight[4] = 0.016216;
+
+                    // 高斯模糊
+                    vec3 result = color.rgb;
+                    result *= weight[0];
+                    for(int i = 1; i < 5; i++){
+                        // 位置偏移
+                        float f = float(i);
+                        if(axis == 0){
+                            // 对x轴进行计算
+                            result += texture2D(tMap, vUv + vec2(st.x * f, 0.0)).rgb * weight[i];
+                            result += texture2D(tMap, vUv - vec2(st.x * f, 0.0)).rgb * weight[i];
+                        }else{
+                            // 对y轴进行计算
+                            result += texture2D(tMap, vUv + vec2(0.0, st.y * f)).rgb * weight[i];
+                            result += texture2D(tMap, vUv - vec2(0.0, st.y * f)).rgb * weight[i];
+                        }
+                    }
+
+                    gl_FragColor.rgb = brightness * result;
+                    gl_FragColor.a = 1.0;
+                }
+            `;
+            
+            // 辉光效果滤镜
+            const bloomFragment = `
+                #ifdef GL_ES
+                precision highp float;
+                #endif
+                
+                uniform sampler2D tSource;
+                uniform sampler2D tMap;
+
+                varying vec2 vUv;
+
+                void main() {
+                    vec2 st = vUv;
+
+                    vec4 color = texture2D(tSource, vUv);
+                    vec4 bloomColor = texture2D(tMap, vUv);
+
+                    color.rgb  += bloomColor.rgb;
+
+                    // Tone Mapping（色调映射）的方法将两次原始图形颜色与高斯模糊后的图形颜色进行混合处理
+                    // 注释：可以将对比度过大的颜色映射到合理范围
+                    float exposure = 2.0;
+                    float gamma = 1.3;
+                    vec3 result = vec3(1.0) - exp(-color.rgb * exposure);
+                    if(length(bloomColor)>0.0){
+                        result = pow(result, vec3(1.0 / gamma));
+                    }
+
+                    gl_FragColor.rgb = result;
+                    gl_FragColor.a = 1.0;
+                }
+            `;
+
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+
+            // 3.
+            renderer.uniforms.axis = 0;
+            // 4.
+            renderer.setMeshData([{
+                positions:[
+                    [-1, -1],
+                    [-1, 1],
+                    [1, 1],
+                    [1, -1],
+                ],
+                attributes:{
+                    uv:[
+                        [0, 0],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                    ]
+                },
+                cells: [[0, 1, 2], [2, 0, 3]],
+            }]);
+
+            // 第一步：将图形输出到帧缓存对象上
+            const fbo0 = renderer.createFBO();
+            const fbo1 = renderer.createFBO();
+            const fbo2 = renderer.createFBO();
+
+
+            renderer.bindFBO(fbo0);//绑定帧缓冲对象
+            renderer.render();//渲染到帧缓冲对象上
+
+            const program1 = renderer.compileSync(blurFragment,vertex);
+            
+            // 第二步：编译blur着色器
+            // 第一遍
+            // x轴进行高斯模糊
+            renderer.useProgram(program1);
+            renderer.uniforms.tMap = fbo0.texture;
+            renderer.uniforms.axis = 0;
+            renderer.uniforms.uResolution = [554.0, 554.0];
+            renderer.uniforms.filter = 0.7;
+            renderer.setMeshData(program.meshData);
+            renderer.bindFBO(fbo1);
+            renderer.render();
+
+            // y轴进行高斯模糊
+            renderer.useProgram(program1);
+            renderer.uniforms.tMap = fbo1.texture;
+            renderer.uniforms.axis = 1;
+            renderer.uniforms.uResolution = [554.0, 554.0];
+            renderer.uniforms.filter = 0.7;
+            renderer.setMeshData(program.meshData);
+            renderer.bindFBO(fbo2);
+            renderer.render();
+
+
+            // 第二遍
+            // x轴进行高斯模糊
+            renderer.useProgram(program1);
+            renderer.uniforms.tMap = fbo2.texture;
+            renderer.uniforms.axis = 0;
+            renderer.uniforms.uResolution = [554.0, 554.0];
+            renderer.uniforms.filter = 0.7;
+            renderer.setMeshData(program.meshData);
+            renderer.bindFBO(fbo1);
+            renderer.render();
+
+            // y轴进行高斯模糊
+            renderer.useProgram(program1);
+            renderer.uniforms.tMap = fbo1.texture;
+            renderer.uniforms.axis = 1;
+            renderer.uniforms.uResolution = [554.0, 554.0];
+            renderer.uniforms.filter = 0.7;
+            renderer.setMeshData(program.meshData);
+            renderer.bindFBO(fbo2);
+            renderer.render();
+
+            // 第三步：叠加辉光
+            const program2 = renderer.compileSync(bloomFragment,vertex);
+            renderer.useProgram(program2);
+            renderer.uniforms.tSource = fbo0.texture;
+            renderer.uniforms.tMap = fbo2.texture;
+            renderer.setMeshData(program.meshData);
+            renderer.bindFBO(null); // 解绑
+
+            // 5.
+            renderer.render();
+        })();
+        
+    </script>
+</body>
+</html>
