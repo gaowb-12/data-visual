@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成简单动画-固定帧动画</title>
+    <style>
+        div{
+            width:88px;
+            height:62px;
+            background-image: url(https://p.ssl.qhimg.com/t01f265b6b6479fffc4.png);
+            background-repeat:no-repeat;
+            background-position: -178px -2px;
+            animation: animation 0.5s step-end infinite;
+        }
+        @keyframes animation {
+            0% {
+                background-position: -178px -2px;
+            }
+            33% {
+                background-position: -90px -2px;
+            }
+            66% {
+                background-position: -2px -2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div></div>
+</body>
+</html>
