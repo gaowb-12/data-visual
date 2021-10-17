@@ -80,8 +80,10 @@
                     
                     vec2 uv = vUv;
                     // 风向向量
-                    // vec2 wind = 0.1 * vec2(noise(uv+ uTime), noise(uv - uTime));
-                    // uv += wind;
+                    float rx = mix(-0.001, 0.002, noise(vec2(7882.21,0.0) + random(uv) + uTime));
+                    float ry = mix(-0.001, 0.002, noise(vec2(0.0,1433.59) + random(uv) + uTime));
+                    vec2 wind = vec2(rx, ry);
+                    uv += wind;
 
                     float offset = 1.0 / 554.0;
 
