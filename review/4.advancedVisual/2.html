@@ -46,9 +46,15 @@
 
         const animate = new Animator({during:1000, iterations:1.5});
 
-        blocks.forEach(item=>{
-            animate.update()
-        });
+        
+        (async function(){
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i];
+                await animate.animate(block, ({target, timing})=>{
+                    target.style.transform = `rotate(${timing.p * 360}deg)`
+                });
+            }
+        })()
 
     </script>
 </body>

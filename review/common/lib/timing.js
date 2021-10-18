@@ -1,6 +1,6 @@
 export class Timing{
     // 动画周期，与动画的执行周期次数
-    constructor(during, iterations){
+    constructor({during, iterations}){
         this.startTime = Date.now();
         this.during = during;
         this.iterations = iterations;
