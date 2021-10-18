@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成简单动画-插值与缓动动画</title>
+    <style>
+        .container{
+            width: 800px;
+            height: 600px;
+            margin: 50px auto;
+        }
+        .container .block{
+            width: 200px;
+            height: 200px;
+            display: inline-block;
+            margin:40px;
+        }
+        .container .block:first-child{
+           background-color: brown;
+        }
+        .container .block:nth-child(2){
+            background-color: orange;
+        }
+        .container .block:nth-child(3){
+            background-color: blueviolet;
+        }
+        .container .block:nth-child(4){
+            background-color: green;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+    </div>
+
+    <script type="module">
+        import { Animator } from "/review/common/lib/animator.js"
+
+        const blocks = document.querySelectorAll(".block");
+
+        // easing实现缓动函数
+        const animate = new Animator({during:1000, iterations:1, easing:(p) => p ** 2});
+        
+        (async function(){
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i];
+                await animate.animate(block, ({target, timing})=>{
+                    // 插值
+                    let p = 0 * (1 - timing.p) + 360 * timing.p;
+                    target.style.transform = `rotate(${p}deg)`
+                });
+            }
+        })()
+
+    </script>
+</body>
+</html>

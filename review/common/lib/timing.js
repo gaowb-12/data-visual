@@ -1,9 +1,10 @@
 export class Timing{
     // 动画周期，与动画的执行周期次数
-    constructor({during, iterations}){
+    constructor({during, iterations,easing}){
         this.startTime = Date.now();
         this.during = during;
         this.iterations = iterations;
+        this.easing = easing;
     }
     // 执行的时间
     get time(){
@@ -12,7 +13,7 @@ export class Timing{
     // 进度
     get p(){
         let progress = Math.min(this.time / this.during, this.iterations);
-        return this.isFinished ? 1 : progress % 1;
+        return this.easing(this.isFinished ? 1 : progress % 1);
     }
     // 判断是否完成
     get isFinished(){
