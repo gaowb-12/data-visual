@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成简单动画-弹性小球</title>
+    <style>
+        .container{
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: greenyellow;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+    </div>
+
+    <script type="module">
+        import { Animator } from "/review/common/lib/animator.js"
+
+        const block = document.querySelector(".container");
+
+        // 忽略摩擦力影响
+        // 自由落体时，为初速度为0的匀加速缓动函数：p**2
+        // 弹起时，为初速度为v的匀减速缓动函数：p*(2-p)
+
+        let direct = 1; // 记录方向，向下为正，向上为负
+        let start = 0, end = 400; // 记录起始与终止的位置
+
+        async function smallGlobal(){
+            let easing = direct == 1 ? 
+                            (p) => p ** 2 : 
+                            (p) => p * (2 - p);
+            const animate = new Animator({during:800, iterations:1, easing});
+
+            await animate.animate(block, ({target, timing})=>{
+                if(Math.abs(start - end)<0.02) return;
+                // 插值
+                let p = start * (1 - timing.p) + end * timing.p;
+                if(p == end){
+                    direct *= -1;//方向相反
+                    if(direct == -1) start += (end - start) * 0.5; // 距离减半
+                    [start, end] = [end, start];
+                    smallGlobal()
+                }
+                target.style.marginTop = `${p}px`;
+            });
+        }
+        smallGlobal()
+
+    </script>
+</body>
+</html>
