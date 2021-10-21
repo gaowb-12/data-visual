@@ -70,16 +70,14 @@
                 void main() {
                     vec2 st = vUv;
                     // 生成随机向量进行位移
-                    float rx = mix(-0.2, 0.2, noise(st + vec2(123.456,0.0) + uTime));
-                    float ry = mix(-0.2, 0.2, noise(st + vec2(0.0,789.012) + uTime));
+                    float rx = mix(-0.2, 0.2, noise(random(st) + vec2(7881.32,0.0) + uTime));
+                    float ry = mix(-0.2, 0.2, noise(random(st) + vec2(0.0,1433.59) + uTime));
 
                     // 生成随机距离场
-                    float d = random(st);
                     float d1 = length(st - 0.5 + vec2(rx, ry));
                     d1 = 1.0 - step(0.2, d1);
-                    vec3 color = vec3(d1 * d);
 
-                    gl_FragColor.rgb = color;
+                    gl_FragColor.rgb = vec3(d1);
                     gl_FragColor.a = 1.0;
                 }
             `;
@@ -114,7 +112,7 @@
             renderer.render();
 
             function update(t){
-                renderer.uniforms.uTime = t * 0.003;
+                renderer.uniforms.uTime = t * 0.001;
                 requestAnimationFrame(update);
             }
             update(0)
