@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>着色器实现像素动画-片元着色器中通过缓动函数实现非线性插值</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        /**
+         * gl-renderer用法
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.设置uniform变量
+         * 4.设置缓冲区数据
+         * 5.渲染
+         * */ 
+
+        //  1.
+         const canvas = document.querySelector("canvas");
+         const renderer = new GlRenderer(canvas);
+
+        (async function(){
+            // 2.
+            const vertex = `
+                attribute vec2 a_vertexPosition;
+                attribute vec2 uv;
+                attribute vec4 color;
+                varying vec2 vUv;
+                varying vec4 vColor;
+
+                uniform float uTime;
+                
+                float easing(float uTime){
+                    return smoothstep(0.0, 0.4, uTime);
+                }
+
+                void main() {
+                    gl_PointSize = 1.0;
+                    vUv = uv;
+
+                    float t = easing(uTime);
+                    vec2 transition = vec2(mix(0.0, 0.9, t), 0.0);
+                    mat3 rotateMatirx = mat3(
+                        1.0, 0.0, 0.0,
+                        0.0, 1.0, 0.0, 
+                        transition, 1.0
+                    );
+                    vColor = color;
+                    vec3 pos = rotateMatirx * vec3(a_vertexPosition, 1.0);
+                    gl_Position = vec4(pos, 1.0);
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                    precision mediump float;
+                #endif
+    
+                varying vec2 vUv;
+                varying vec4 vColor;
+
+                uniform vec4 fromColor;
+                uniform vec4 toColor;
+
+                float easing(float p){
+                    return smoothstep(0.0, 1.0, p);
+                }
+                
+                void main() {
+                    vec2 st = vUv;
+                    float p = easing(vUv.x);
+                    gl_FragColor = mix(fromColor,toColor,p);
+                }
+            `;
+    
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+    
+            // 3.
+            renderer.uniforms.uTime = 0;
+            renderer.uniforms.fromColor = [1, 0, 0, 1];
+            renderer.uniforms.toColor = [0, 0.5, 0, 1];
+    
+            // 4.
+            const x = 0.75;
+            const y = 0.75;
+            renderer.setMeshData([{
+                positions:[
+                    [-x, -y],
+                    [-x, y],
+                    [x, y],
+                    [x, -y],
+                ],
+                attributes:{
+                    uv:[
+                        [0, 0],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                    ],
+                    color:[
+                        [1, 0, 0, 1],
+                        [1, 0, 0, 1],
+                        [0, 0.5, 0, 1],
+                        [0, 0.5, 0, 1],
+                    ]
+                },
+                cells: [[0, 1, 2], [2, 0, 3]],
+            }]);
+    
+            // 5.
+            renderer.render();
+
+            // function update(t){
+            //     renderer.uniforms.uTime = t * 0.0005;
+            //     requestAnimationFrame(update);
+            // }
+            // update(0)
+        })();
+
+    </script>
+</body>
+</html>
