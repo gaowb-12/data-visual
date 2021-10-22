@@ -12,7 +12,7 @@
     </style>
 </head>
 <body>
-    <canvas width="512" height="512"></canvas>
+    <canvas width="768" height="432"></canvas>
 
     <script src="/common/lib/gl-renderer.js"></script>
     <script type="module">
@@ -52,6 +52,10 @@
                 uniform float uTime;
                 uniform sampler2D tMap;
 
+                float easing(float uTime){
+                    return smoothstep(0.0, 0.4, uTime);
+                }
+
                 // 二维随机数
                 float random(vec2 st){
                     return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -71,16 +75,19 @@
                 void main() {
                     vec2 st = vUv;
                     // 生成随机向量进行位移
-                    float rx = mix(-0.2, 0.2, noise(random(st) + vec2(7881.32,0.0) + uTime));
-                    float ry = mix(-0.2, 0.2, noise(random(st) + vec2(0.0,1433.59) + uTime));
+                    // float rx = mix(-0.2, 0.2, noise(random(st) + vec2(7881.32,0.0) + uTime));
+                    // float ry = mix(-0.2, 0.2, noise(random(st) + vec2(0.0,1433.59) + uTime));
 
                     // 生成随机距离场
-                    float d1 = length(st - 0.5 + vec2(rx, ry));
-                    d1 = 1.0 - step(0.1, d1);
+                    vec2 v = st - 0.5; // 运动的方向
+                    v += normalize(v) * easing(uTime); // 运动的距离
+                    float d = length(v);
+                    float opacity = 1.0 - mix(0.0, 1.0, easing(uTime));
+                    // d = 1.0 - step(uTime, d);
 
-                    vec3 color = texture2D(tMap, vUv).rgb;
+                    vec3 color = texture2D(tMap, vUv - v).rgb;
 
-                    gl_FragColor.rgb = vec3(d1) * color;
+                    gl_FragColor.rgb = opacity * random(st) * color;
                     gl_FragColor.a = 1.0;
                 }
             `;
@@ -117,7 +124,7 @@
             renderer.render();
 
             function update(t){
-                renderer.uniforms.uTime = t * 0.001;
+                renderer.uniforms.uTime = t * 0.00005;
                 requestAnimationFrame(update);
             }
             update(0)
