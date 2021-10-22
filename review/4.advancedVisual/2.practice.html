@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>着色器实现像素动画-片元着色器中实现随机粒子动画</title>
+    <title>着色器实现像素动画-小试牛刀-图片爆炸效果</title>
     <style>
         canvas{
             border: 1px solid #ccc;
@@ -50,6 +50,7 @@
     
                 varying vec2 vUv;
                 uniform float uTime;
+                uniform sampler2D tMap;
 
                 // 二维随机数
                 float random(vec2 st){
@@ -77,15 +78,19 @@
                     float d1 = length(st - 0.5 + vec2(rx, ry));
                     d1 = 1.0 - step(0.1, d1);
 
-                    gl_FragColor.rgb = vec3(d1);
+                    vec3 color = texture2D(tMap, vUv).rgb;
+
+                    gl_FragColor.rgb = vec3(d1) * color;
                     gl_FragColor.a = 1.0;
                 }
             `;
-    
+            // https://blog.csdn.net/llimite/article/details/66974907
             const program = renderer.compileSync(fragment,vertex);
             renderer.useProgram(program);
     
             // 3.
+            const texture = await renderer.loadTexture("./assets/girl3.jpg");
+            renderer.uniforms.tMap = texture;
             renderer.uniforms.uTime = 0;
             // 4.
             const x = 1;
