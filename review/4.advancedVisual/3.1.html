@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用WebGL绘制3D物体-投影矩阵</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        /**
+         * gl-renderer用法
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.设置uniform变量
+         * 4.设置缓冲区数据
+         * 5.渲染
+         * 
+         * */ 
+
+        //  1.
+         const canvas = document.querySelector("canvas");
+         const renderer = new GlRenderer(canvas,{
+            depth:true
+         });
+
+        /**
+         * 生成立方体的顶点信息和三角形的索引
+         * size：立方体边长
+         * colors：每个面的颜色
+        */
+        function cube(size=1.0,colors=[[1,0,0,1]]){
+            const positions = [];
+            const cells = [];
+            const color = [];
+            const h = size / 2;
+            let colorIdx = 0, cellIdx = 0;
+            
+            // 列出立方体的8个顶点的位置
+            const vertex = [
+                [-h, -h, -h],
+                [h, -h, -h],
+                [h, h, -h],
+                [-h, h, -h],
+                [-h, h, h],
+                [-h, -h, h],
+                [h, -h, h],
+                [h, h, h],
+            ];
+
+            // 每四个顶点作为一个面进行一次遍历
+            function gen(data){
+                data.forEach((v,i) => {
+                    positions.push(vertex[v]);
+                    color.push(colors[colorIdx % colors.length]);
+                });
+                cells.push([cellIdx,cellIdx + 1,cellIdx + 2],[cellIdx, cellIdx + 2, cellIdx + 3]);
+                // 下一个面的颜色索引
+                colorIdx++;
+                cellIdx+=4;
+            }
+            gen([0, 1, 2, 3]);
+            gen([4, 5, 6, 7]);
+            gen([2, 3, 4, 7]);
+            gen([0, 1, 6, 5]);
+            gen([0, 3, 4, 5]);
+            gen([1, 2, 7, 6]);
+
+            return {positions,cells,color};
+        }
+
+        let cubes = cube(1.0,[
+            [1, 0, 0, 1], 
+            [0, 0.5, 0, 1],
+            [0, 0, 1, 1]
+        ]);
+        (async function(){
+            // 2.
+            const vertex = `
+                attribute vec3 a_vertexPosition;
+                attribute vec4 color;
+
+                uniform mat4 projectionMatrix;
+                varying vec4 vColor;
+                
+                void main() {
+                    gl_PointSize = 1.0;
+                    vColor = color;
+                    vec4 pos = projectionMatrix * vec4(a_vertexPosition, 1.0);
+                    gl_Position = pos;
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                    precision mediump float;
+                #endif
+    
+                varying vec4 vColor;
+                
+                void main() {
+                    vec4 color = vColor;
+                    gl_FragColor = color;
+                }
+            `;
+    
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+    
+            // 3.
+            // 投影矩阵
+            renderer.uniforms.projectionMatrix = [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, -1, 0,
+                0, 0, 0, 1
+            ];
+            // 4.
+            renderer.setMeshData([{
+                positions:cubes.positions,
+                attributes:{
+                    color:cubes.color
+                },
+                cells: cubes.cells,
+            }]);
+    
+            // 5.
+            renderer.render();
+
+        })();
+
+    </script>
+</body>
+</html>
