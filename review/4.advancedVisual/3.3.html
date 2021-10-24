@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用WebGL绘制3D物体-绘制圆柱体</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        import { multiply } from "/common/lib/math/functions/Mat4Func.js"
+        /**
+         * gl-renderer用法
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.设置uniform变量
+         * 4.设置缓冲区数据
+         * 5.渲染
+         * 
+         * */ 
+
+        //  1.
+         const canvas = document.querySelector("canvas");
+         const renderer = new GlRenderer(canvas,{
+            depth:true
+         });
+
+        /**
+         * 生成立方体的顶点信息和三角形的索引
+         * radius：圆柱体半径
+         * size：圆柱体侧面高
+         * segments：底面分割
+         * colors：每个面的颜色
+        */
+        function cylinder(radius = 0.4, size = 1.0, segments = 50, colorCap = [0,0,1,1], colorSide = [1,0,0,1]){
+            const positions = [];
+            const cells = [];
+            const cell = [[0,0]];
+            const color = [];
+            const h = size / 2;
+            let colorIdx = 0, cellIdx = 0;
+            
+            // 切割底面
+            for (let i = 0; i < segments; i++) {
+                const r = Math.PI * 2 * i / segments;
+                const x = radius * Math.cos(r);
+                const y = radius * Math.sin(r);
+                cell.push([x, y]);
+            }
+
+            // 处理上下底面
+            // 上底面
+            positions.push(...cell.map(([a,b]) => ([a,b,h])));
+            for (let i = 1; i < cell.length - 1; i++) {
+                cells.push([0, i, i+1]);
+            }
+            cells.push([0, 1, cell.length-1]);
+            // 下底面
+            let offset = positions.length;
+            positions.push(...cell.map(([a,b]) => ([a,b,-h])));
+            for (let i = 1; i < cell.length - 1; i++) {
+                cells.push([offset, offset + i, offset + i + 1]);
+            }
+            cells.push([offset, offset + 1, offset + cell.length - 1]);
+            // 上下底面颜色
+            color.push(...positions.map(() => colorCap));
+
+            // 处理侧面
+            offset = positions.length;
+            for (let i = 1; i < cell.length; i++) {
+                let a = [...cell[i], h];
+                let b = [...cell[i], -h];
+                let newIdx = i < cell.length - 1 ? i + 1 : 1;
+                let c = [...cell[newIdx], -h];
+                let d = [...cell[newIdx], h];
+                positions.push(a, b, c, d);
+                cells.push([offset, offset + 1, offset + 2], [offset, offset + 2, offset + 3]);
+                color.push(colorSide, colorSide, colorSide, colorSide);
+                offset += 4;
+            }
+            
+            return {positions, cells, color};
+        }
+
+        let cylinders = cylinder();
+        console.log(cylinders);
+        (async function(){
+            // 2.
+            const vertex = `
+                attribute vec3 a_vertexPosition;
+                attribute vec4 color;
+
+                uniform mat4 projectionMatrix;
+                uniform mat4 modelMatrix;
+                varying vec4 vColor;
+                
+                void main() {
+                    gl_PointSize = 1.0;
+                    vColor = color;
+                    vec4 pos = projectionMatrix * modelMatrix * vec4(a_vertexPosition, 1.0);
+                    gl_Position = pos;
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                    precision mediump float;
+                #endif
+    
+                varying vec4 vColor;
+                
+                void main() {
+                    vec4 color = vColor;
+                    gl_FragColor = color;
+                }
+            `;
+    
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+    
+            // 3.
+            // 投影矩阵
+            renderer.uniforms.projectionMatrix = [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, -1, 0,
+                0, 0, 0, 1
+            ];
+            // 模型矩阵
+            renderer.uniforms.modelMatrix = [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            ];
+            
+            // 4.
+            renderer.setMeshData([{
+                positions:cylinders.positions,
+                attributes:{
+                    color:cylinders.color
+                },
+                cells: cylinders.cells,
+            }]);
+    
+            // 5.
+            renderer.render();
+
+
+            function fromRatation(rotatex, rotatey, rotatez){
+                let c = Math.cos(rotatex);
+                let s = Math.sin(rotatex);
+                let rotatexMatrix = [
+                    1, 0, 0, 0,
+                    0, c, s, 0,
+                    0, -s, c, 0,
+                    0, 0, 0, 1
+                ];
+                c = Math.cos(rotatey);
+                s = Math.sin(rotatey);
+                let rotateyMatrix = [
+                    c, 0, s, 0,
+                    0, 1, 0, 0,
+                    -s, 0, c, 0,
+                    0, 0, 0, 1
+                ];
+                c = Math.cos(rotatez);
+                s = Math.sin(rotatez);
+                let rotatezMatrix = [
+                    c, s, 0, 0,
+                    -s, c, 0, 0,
+                    0, 0, 1, 0,
+                    0, 0, 0, 1
+                ];
+                let ret = [];
+                multiply(ret, rotatexMatrix, rotateyMatrix);
+                multiply(ret, ret, rotatezMatrix);
+                return ret;
+            }
+
+            let rotateX = 0, rotateY = 0, rotateZ = 0; 
+            function update(t){
+                rotateX += 0.01; 
+                rotateY += 0.02; 
+                rotateZ += 0.03; 
+                renderer.uniforms.modelMatrix = fromRatation(rotateX,rotateY,rotateZ);
+                requestAnimationFrame(update);
+            }
+            update()
+        })();
+
+    </script>
+</body>
+</html>
