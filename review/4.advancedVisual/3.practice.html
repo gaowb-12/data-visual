@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用WebGL绘制3D物体-小试牛刀-正四面体</title>
+    <style>
+        canvas{
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script src="/common/lib/gl-renderer.js"></script>
+    <script type="module">
+        import { multiply } from "/common/lib/math/functions/Mat4Func.js"
+        import { cross, subtract, normalize } from "/common/lib/math/functions/Vec3Func.js"
+        import { normalFromMat4 } from '/common/lib/math/functions/Mat3Func.js';
+        /**
+         * gl-renderer用法
+         * 1.创建renderer对象
+         * 2.创建webgl程序
+         * 3.设置uniform变量
+         * 4.设置缓冲区数据
+         * 5.渲染
+         * 
+         * */ 
+
+        //  1.
+         const canvas = document.querySelector("canvas");
+         const renderer = new GlRenderer(canvas,{
+            depth:true
+         });
+
+        /**
+         * 生成四面体的顶点信息和三角形的索引
+         * size：四面体边长
+         * colors：每个面的颜色
+        */
+        function cylinder(size = 1, colors = [[0,0,1,1]]){
+            const positions = []; // 顶点集合
+            const cells = []; // 三角形集合
+            const color = []; // 顶点颜色
+            const normal = []; // 法向量集合
+            let colorIdx = 0;
+            
+            //计算正四面体的四个顶点
+            const h = size / 2, b = Math.sqrt(3) * size / 6;
+            const z = Math.sqrt(6) / 6;
+            const vertex = [
+                [0, 2 * b, -z],
+                [h, -b, -z],
+                [-h, -b, -z],
+                [0, 0, z],
+            ];
+            const tmp1 = [], tmp2 = [];
+            function gen(data){
+                // 计算三角形
+                const l = positions.length;
+                cells.push([l, l + 1, l + 2]);
+
+                // 计算顶点
+                data.forEach((v,i) => {
+                    positions.push(vertex[v]);
+                    color.push(colors[colorIdx % colors.length]);
+                });
+                colorIdx++;
+
+                let b = vertex[data[0]];
+                let a = vertex[data[1]];
+                let c = vertex[data[2]];
+                // 计算法向量
+                let n = [];
+                cross(n, subtract(tmp2, b, a), subtract(tmp1, c, a));
+                normalize(n, n);
+                normal.push(n, n, n, n);
+            }
+
+            gen([0,1,2]);
+            gen([0,3,1]);
+            gen([0,3,2]);
+            gen([1,3,2]);
+
+            return {positions, cells, color, normal};
+        }
+
+        let cylinders = cylinder(1, [[0, 0.6, 0.6, 1], [0, 0.5, 0, 1],[0, 0, 1, 1], [0.5, 0.5, 0.5, 1]]);
+        
+        (async function(){
+            // 2.
+            const vertex = `
+                attribute vec3 a_vertexPosition;
+                attribute vec4 color;
+                attribute vec3 normal;
+
+                uniform mat4 projectionMatrix;
+                uniform mat4 modelMatrix;
+                uniform mat3 normalMatrix;
+
+                varying vec4 vColor;
+                varying float vCos;
+                
+                // 点光源位置
+                const vec3 lightPosition = vec3(1.0, 0.0, 0.0);
+                
+                void main() {
+                    gl_PointSize = 1.0;
+                    vColor = color;
+
+                    vec4 pos = modelMatrix * vec4(a_vertexPosition, 1.0);
+
+                    vec3 vNormal = normalMatrix * normal;
+                    vec3 lightPos = lightPosition - pos.xyz;
+                    vCos = max(dot(normalize(vNormal), normalize(lightPos)), 0.0);
+
+                    gl_Position = projectionMatrix * pos;
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                    precision mediump float;
+                #endif
+
+                uniform vec4 lightColor;
+    
+                varying vec4 vColor;
+                varying float vCos;
+                
+                void main() {
+                    gl_FragColor.rgb = vColor.rgb + vCos * lightColor.a * lightColor.rgb;
+                    gl_FragColor.a = vColor.a;
+                }
+            `;
+    
+            const program = renderer.compileSync(fragment,vertex);
+            renderer.useProgram(program);
+    
+            // 3.
+            // 投影矩阵
+            renderer.uniforms.projectionMatrix = [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, -1, 0,
+                0, 0, 0, 1
+            ];
+            // 模型矩阵
+            renderer.uniforms.modelMatrix = [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            ];
+            
+            // 法向量矩阵
+            renderer.uniforms.normalMatrix = [
+                1, 0, 0,
+                0, 1, 0,
+                0, 0, 1
+            ];
+            renderer.uniforms.lightColor = [1.0, 0,0, 0.4, 0.8];
+            
+            // 4.
+            renderer.setMeshData([{
+                positions:cylinders.positions,
+                attributes:{
+                    color:cylinders.color,
+                    normal:cylinders.normal,
+                },
+                cells: cylinders.cells,
+            }]);
+    
+            // 5.
+            renderer.render();
+
+            // 计算旋转模型矩阵
+            function fromRatation(rotatex, rotatey, rotatez){
+                let c = Math.cos(rotatex);
+                let s = Math.sin(rotatex);
+                let rotatexMatrix = [
+                    1, 0, 0, 0,
+                    0, c, s, 0,
+                    0, -s, c, 0,
+                    0, 0, 0, 1
+                ];
+                c = Math.cos(rotatey);
+                s = Math.sin(rotatey);
+                let rotateyMatrix = [
+                    c, 0, s, 0,
+                    0, 1, 0, 0,
+                    -s, 0, c, 0,
+                    0, 0, 0, 1
+                ];
+                c = Math.cos(rotatez);
+                s = Math.sin(rotatez);
+                let rotatezMatrix = [
+                    c, s, 0, 0,
+                    -s, c, 0, 0,
+                    0, 0, 1, 0,
+                    0, 0, 0, 1
+                ];
+                let ret = [];
+                multiply(ret, rotatexMatrix, rotateyMatrix);
+                multiply(ret, ret, rotatezMatrix);
+                return ret;
+            }
+
+            let rotateX = 0, rotateY = 0, rotateZ = 0; 
+            function update(t){
+                rotateX += 0.01; 
+                rotateY += 0.02; 
+                rotateZ += 0.03; 
+                // 模型矩阵
+                const modelMatrix = fromRatation(rotateX,rotateY,rotateZ);
+                renderer.uniforms.modelMatrix = modelMatrix;
+                // 法向量矩阵
+                renderer.uniforms.normalMatrix = normalFromMat4([], modelMatrix);
+                requestAnimationFrame(update);
+            }
+            update()
+        })();
+
+    </script>
+</body>
+</html>
