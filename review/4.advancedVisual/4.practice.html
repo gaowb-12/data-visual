@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>添加相机，用透视原理对物体进行投影-3D绘图标准模型</title>
+    <title>添加相机，用透视原理对物体进行投影-小试牛刀1</title>
     <style>
         canvas{
             display: block;
@@ -13,12 +13,6 @@
     </style>
 </head>
 <body>
-    <h4>绘图标准模型包括</h4>
-    <p>模型矩阵：对物体进行3D变换，将物体从局部坐标系变换到世界坐标系。</p>
-    <p>视图矩阵：添加相机位置，将物体从世界坐标系转换到相机坐标系。</p>
-    <p>法向量矩阵：转换顶点的法向量，用于计算光照、法线贴图、物体表面材质等。法向量矩阵的计算并不是模型矩阵，而是模型矩阵的逆转置矩阵。</p>
-    <p>投影矩阵：正投影和透视投影，将物体转换到剪裁坐标空间，得到真实的投影效果。</p>
-
     <canvas width="512" height="512"></canvas>
 
     <script type="module">
@@ -57,9 +51,16 @@
         const scene = new Transform();
 
         // 4.创建几何体对象
+        // 立方体
         const boxGeometry = new Box(gl);
-        const sphereGeometry = new Sphere(gl);
+        // 球体
+        const sphereGeometry = new Sphere(gl, {
+            widthSegments : 32,
+            heightSegments : Math.ceil(16),
+        });
+        // 圆柱体
         const cylinderGeometry = new Cylinder(gl);
+        // 圆环体
         const torusGeometry = new Torus(gl);
 
         // 5.创建webgl程序
