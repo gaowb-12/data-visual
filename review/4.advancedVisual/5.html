@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仿射变换来移动和旋转3D物体-欧拉角旋转几何体</title>
+    <style>
+        canvas{
+            display: block;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Renderer, Camera, Transform, Box, Sphere, Cylinder, Torus, Program, Mesh } from 'https://unpkg.com/ogl';
+
+        /**
+         * OGL用法
+         * 1.创建renderer对象
+         * 2.创建相机
+         * 3.创建场景
+         * 4.创建几何体对象
+         * 5.创建webgl程序
+         * 6.设置网格对象
+         * 7.完成渲染
+         * */ 
+
+        const canvas = document.querySelector("canvas");
+        //  1.创建renderer对象
+        const renderer = new Renderer({
+            canvas,
+            width:512,
+            height:512,
+        });
+        const gl = renderer.gl;
+        gl.clearColor(1, 1, 1, 1);
+
+        // 2.创建相机
+        const camera = new Camera(gl, {
+            fov:35
+        });
+        // 默认透视投影
+        camera.position.set(0, 1, 7);
+        camera.lookAt([0,0,0]);
+
+        // 3.创建场景
+        const scene = new Transform();
+
+        // 4.创建几何体对象
+        // 立方体
+        const boxGeometry = new Box(gl);
+        // 球体
+        const sphereGeometry = new Sphere(gl, {
+            widthSegments : 32,
+            heightSegments : Math.ceil(16),
+        });
+        // 圆柱体
+        const cylinderGeometry = new Cylinder(gl);
+        // 圆环体
+        const torusGeometry = new Torus(gl);
+
+        // 5.创建webgl程序
+        const vertex = `
+            attribute vec3 position;
+            attribute vec3 normal;
+
+            uniform mat4 projectionMatrix;
+            uniform mat4 modelViewMatrix;
+            uniform mat3 normalMatrix;
+
+            varying vec3 vNormal;
+            
+            // 点光源位置
+            const vec3 lightPosition = vec3(1.0, 0.0, 0.0);
+            
+            void main() {
+                gl_PointSize = 1.0;
+                vec4 pos = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                vNormal = normalize(normalMatrix * normal);
+
+                gl_Position = pos;
+            }
+        `;
+        const fragment = `
+            #ifdef GL_ES
+                precision mediump float;
+            #endif
+
+            varying vec3 vNormal;
+            
+            void main() {
+                vec3 normal = normalize(vNormal);
+                // 平行光效果
+                float lighting = dot(normal, normalize(vec3(-0.3, 0.8, 0.6)));
+                gl_FragColor.rgb = vec3(0.2, 0.8, 1.0) + lighting * 0.1;
+                gl_FragColor.a = 1.0;
+            }
+        `;
+        const program = new Program(gl, {
+            vertex,
+            fragment
+        });
+
+        // 6.设置网格对象
+        const boxMesh = new Mesh(gl, {geometry:boxGeometry, program});
+        boxMesh.position.set(0, 1.3, 0);
+        boxMesh.setParent(scene);
+
+        const sphereMesh = new Mesh(gl, {geometry:sphereGeometry, program});
+        sphereMesh.position.set(1.3, 0, 0);
+        sphereMesh.setParent(scene);
+
+        const cylinderMesh = new Mesh(gl, {geometry:cylinderGeometry, program});
+        cylinderMesh.position.set(0, -1.3, 0);
+        cylinderMesh.setParent(scene);
+
+        const torusMesh = new Mesh(gl, {geometry:torusGeometry, program});
+        torusMesh.position.set(-1.3, 0, 0);
+        torusMesh.setParent(scene);
+
+        // 7. 完成渲染
+
+        function update(t){
+            boxMesh.rotation.y -= 0.01;
+            sphereMesh.rotation.y -= 0.02;
+            cylinderMesh.rotation.y -= 0.03;
+            torusMesh.rotation.y -= 0.04;
+            renderer.render({scene, camera});
+            requestAnimationFrame(update);
+        }
+        update();
+    </script>
+</body>
+</html>
