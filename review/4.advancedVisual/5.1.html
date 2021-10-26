@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仿射变换来移动和旋转3D物体-使用四元数旋转几何体</title>
+    <style>
+        canvas{
+            display: block;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <canvas width="512" height="512"></canvas>
+
+    <script type="module">
+        import { Renderer, Camera, Transform, Geometry, Polyline, Program, Mesh, Texture, Quat, Color } from 'https://unpkg.com/ogl';
+        import { Vec3 } from "/common/lib/math/Vec3.js"
+
+        // 加载飞机模型数据，生成几何体数据
+        async function loadModel(src, gl){
+            const data = await (await fetch(src)).json();
+            const geometry = new Geometry(gl, {
+                position:{size:3, data:new Float32Array(data.position)},
+                normal:{size:3, data:new Float32Array(data.normal)},
+                uv:{size:2, data:new Float32Array(data.uv)},
+            });
+            return geometry;
+        }
+
+        // 加载飞机模型数据，生成几何体数据
+        function loadTexture(src, gl){
+            const texture = new Texture(gl);
+            return new Promise(function(resolve){
+                const image = new Image();
+                image.onload = function(){
+                    texture.image = image;
+                    resolve(texture);
+                };
+                image.src = src;
+            });
+        }
+
+        /**
+         * OGL用法
+         * 1.创建renderer对象
+         * 2.创建相机
+         * 3.创建场景
+         * 4.创建几何体对象
+         * 5.创建webgl程序
+         * 6.设置网格对象
+         * 7.完成渲染
+         * */ 
+
+        const canvas = document.querySelector("canvas");
+        (async function(){
+            //  1.创建renderer对象
+            const renderer = new Renderer({
+                canvas,
+                width:512,
+                height:512,
+            });
+            const gl = renderer.gl;
+            gl.clearColor(1, 1, 1, 1);
+    
+            // 2.创建相机
+            const camera = new Camera(gl, {
+                fov:35
+            });
+            // 默认透视投影
+            camera.position.set(0, 1, 7);
+            camera.lookAt([0,0,0]);
+    
+            // 3.创建场景
+            const scene = new Transform();
+    
+            // 4.创建几何体对象
+            const geometry = await loadModel("./assets/airplane.json", gl);
+    
+            // 5.创建webgl程序
+            const vertex = `
+                attribute vec3 position;
+                attribute vec3 normal;
+                attribute vec2 uv;
+    
+                uniform mat4 projectionMatrix;
+                uniform mat4 modelViewMatrix;
+                uniform mat3 normalMatrix;
+    
+                varying vec3 vNormal;
+                varying vec2 vUv;
+                
+                // 点光源位置
+                const vec3 lightPosition = vec3(1.0, 0.0, 0.0);
+                
+                void main() {
+                    gl_PointSize = 1.0;
+                    vec4 pos = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    vNormal = normalize(normalMatrix * normal);
+                    vUv = uv;
+    
+                    gl_Position = pos;
+                }
+            `;
+            const fragment = `
+                #ifdef GL_ES
+                    precision mediump float;
+                #endif
+                
+                uniform sampler2D tMap;
+                varying vec3 vNormal;
+                varying vec2 vUv;
+
+                void main() {
+                    vec3 normal = normalize(vNormal);
+                    // 平行光效果
+                    float lighting = dot(normal, normalize(vec3(-0.3, 0.8, 0.6)));
+                    
+                    // 取纹理图片的颜色信息进行着色
+                    vec3 color = texture2D(tMap, vUv).rgb;
+
+                    gl_FragColor.rgb = color + lighting * 0.1;
+                    gl_FragColor.a = 1.0;
+                }
+            `;
+            // 加载纹理图片
+            const texture = await loadTexture("./assets/airplane.jpg", gl);
+            const program = new Program(gl, {
+                vertex,
+                fragment,
+                uniforms:{
+                    tMap:{value: texture}
+                }
+            });
+    
+            // 6.设置网格对象
+            const geometryMesh = new Mesh(gl, {geometry, program});
+            geometryMesh.position.set(0, 0, 0);
+            geometryMesh.setParent(scene);
+            
+            // 初始化轴线向量
+            const points = [
+                new Vec3(0,0,0),
+                new Vec3(4,6,0),
+            ]
+            // 轴线绘制
+            const axis = new Polyline(gl, {
+                points,
+                uniforms:{
+                    uColor:{value: new Color("#f00")},
+                    uThickness:{value:3}
+                }
+            });
+            axis.mesh.setParent(scene);
+
+            // 7. 完成渲染
+            
+            /**
+             * 更新轴
+             * palette：轴向量的方向
+             * */
+            function updateAxis(palette){
+                // 设置轴向量
+                const {x,y,z} = palette;
+                // 生成随机的轴向量
+                const v = new Vec3(x,y,z).normalize().scale(10);
+                points[1].copy(v);
+                // 更新轴
+                axis.updateGeometry();
+                renderer.render({scene, camera});
+            }
+            /**
+             * 更新四元数
+             * mesh：网格对象
+             * val：绕轴旋转角度
+             * */ 
+            function updateQuaternion(mesh, val){
+                //旋转角度转换为弧度
+                const radius = 0.5 * val * Math.PI / 180;
+                const c = Math.cos(radius);
+                const s = Math.sin(radius);
+                // 将轴向量处理为单位向量
+                const p = new Vec3().copy(points[1]).normalize();
+                // 生成四元数
+                const quater = new Quat(p.x * s, p.y * s, p.z * s, c);
+                mesh.quaternion = quater;
+                renderer.render({scene, camera});
+            }
+
+            function update(t){
+                updateQuaternion(geometryMesh, t * 0.05);
+    
+                requestAnimationFrame(update);
+            }
+            update();
+        })();
+    </script>
+</body>
+</html>
